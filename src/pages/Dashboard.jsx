@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Dashboard = ({ setCurrentPage }) => {
+const Dashboard = ({ setCurrentPage, categories }) => {
   const stats = [
     {
       label: 'Total Pharmacies',
@@ -25,12 +25,11 @@ const Dashboard = ({ setCurrentPage }) => {
     }
   ]
 
-  const catalogItems = [
-    { name: 'Painkillers', count: '540 items', icon: 'pill' },
-    { name: 'Chronic Meds', count: '1.2k items', icon: 'medical' },
-    { name: 'Baby Care', count: '320 items', icon: 'baby' },
-    { name: 'Supplements', count: '890 items', icon: 'supplement' }
-  ]
+  const catalogItems = categories.slice(0, 4).map(cat => ({
+    name: cat.name,
+    count: `${cat.medicines.length} item${cat.medicines.length !== 1 ? 's' : ''}`,
+    icon: cat.icon
+  }))
 
   const recentOrders = [
     { id: '#ORD-8821', pharmacy: 'Green Valley Meds', driver: 'Alex Rivera', driverAvatar: 'https://ui-avatars.com/api/?name=Alex+Rivera&background=FFD700&color=fff', status: 'delivered', value: '$42.50' },
@@ -128,9 +127,22 @@ const Dashboard = ({ setCurrentPage }) => {
         </div>
         <div className="catalog-grid">
           {catalogItems.map((item, index) => (
-            <div key={index} className="catalog-card">
-              <div className="catalog-icon">
-                {getIcon(item.icon)}
+            <div 
+              key={index} 
+              className="catalog-card"
+              onClick={() => setCurrentPage('catalog')}
+              style={{ cursor: 'pointer', transition: 'transform 0.2s, box-shadow 0.2s' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '';
+              }}
+            >
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>
+                {item.icon}
               </div>
               <h4 className="catalog-title">{item.name}</h4>
               <p className="catalog-count">{item.count}</p>

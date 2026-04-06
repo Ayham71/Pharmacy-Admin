@@ -4,9 +4,22 @@ const Login = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!email.trim()) {
+      setError('Please enter your email or username');
+      return;
+    }
+    
+    if (!password.trim()) {
+      setError('Please enter your password');
+      return;
+    }
+    
+    setError('');
     onLogin();
   };
 
@@ -34,6 +47,21 @@ const Login = ({ onLogin }) => {
         {/* Title */}
         <h1 className="card-title">Admin Portal</h1>
         <p className="card-subtitle">Access your professional dashboard</p>
+
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '16px',
+            backgroundColor: '#ffebee',
+            borderLeft: '4px solid #f44336',
+            borderRadius: '4px',
+            color: '#c62828',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Email Field */}
         <div className="form-group">
