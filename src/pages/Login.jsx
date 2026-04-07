@@ -5,8 +5,9 @@ const Login = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!email.trim()) {
@@ -20,7 +21,55 @@ const Login = ({ onLogin }) => {
     }
     
     setError('');
-    onLogin();
+    setLoading(true);
+    
+    try {
+      const response = await fetch('http://165.22.91.187:5000/api/Auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || 'Login failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Check if token exists
+      if (!data.token) {
+        setError('No token received from server');
+        setLoading(false);
+        return;
+      }
+
+      // Check if user role is admin
+      if (data.role !== 'Admin') {
+        setError('You do not have admin privileges. Please contact your administrator.');
+        setLoading(false);
+        return;
+      }
+
+      // Store token and user info in localStorage
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('userRole', data.role);
+      localStorage.setItem('userEmail', data.email || email);
+
+      // Call onLogin callback to navigate or update app state
+      onLogin();
+    } catch (err) {
+      setError('Connection error. Please check your network and try again.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const togglePassword = () => {
@@ -127,12 +176,23 @@ const Login = ({ onLogin }) => {
         </div>
 
         {/* Login Button */}
-        <button type="submit" className="login-button">
-          Login to Dashboard
-          <svg viewBox="0 0 24 24">
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
+        <button type="submit" className="login-button" disabled={loading}>
+          {loading ? (
+            <>
+              <span>Logging in...</span>
+              <svg viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="15.7 47.1" />
+              </svg>
+            </>
+          ) : (
+            <>
+              Login to Dashboard
+              <svg viewBox="0 0 24 24">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </>
+          )}
         </button>
 
         {/* SSL Badge */}
