@@ -21,6 +21,19 @@ function App() {
     role: 'System Administrator',
     avatar: 'https://ui-avatars.com/api/?name=Admin&background=FFD700&color=fff'
   })
+
+  // Check if user is logged in on app startup
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    const userRole = localStorage.getItem('userRole');
+    
+    if (token && userRole === 'admin') {
+      setIsLoggedIn(true);
+    } else {
+      setIsLoggedIn(false);
+      setCurrentPage('login');
+    }
+  }, []);
   const [categories, setCategories] = useState([
     { 
       id: 1, 
@@ -99,8 +112,13 @@ function App() {
   }
 
   const handleLogout = () => {
-    setIsLoggedIn(false)
-    setCurrentPage('login')
+    // Clear authentication data from localStorage
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userEmail');
+    
+    setIsLoggedIn(false);
+    setCurrentPage('login');
   }
 
   const handleUpdateAdmin = (updatedData) => {
