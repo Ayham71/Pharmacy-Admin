@@ -16,6 +16,9 @@ const Header = ({ adminData }) => {
     return titles[path.replace('#', '')] || 'System'
   }
 
+  const username = adminData?.username || 'Admin'
+  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=FFD700&color=fff&size=128`
+
   return (
     <header className="header">
       <div className="header-left">
@@ -23,8 +26,8 @@ const Header = ({ adminData }) => {
       </div>
       <div className="header-right">
         <img 
-          src={adminData.avatar} 
-          alt="Admin" 
+          src={avatarUrl} 
+          alt={username} 
           className="admin-avatar"
         />
       </div>
