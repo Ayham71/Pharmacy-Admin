@@ -459,12 +459,12 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
         ) : (
           <form className="settings-form" onSubmit={handleSave}>
             {error && (
-              <div style={{ padding: '12px 16px', marginBottom: '20px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className='error-message'>
                 <span>⚠️</span><span>{error}</span>
               </div>
             )}
             {success && (
-              <div style={{ padding: '12px 16px', marginBottom: '20px', backgroundColor: '#e8f5e9', borderLeft: '4px solid #4caf50', borderRadius: '4px', color: '#2e7d32', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div className='success-message'>
                 <span>✅</span><span>{success}</span>
               </div>
             )}
@@ -479,7 +479,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 Username
                 {editMode && isFieldChanged('username') && (
-                  <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
+                  <span style={{ fontSize: '11px', backgroundColor: 'var(--white)', color: 'var(--gold-dark)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
                 )}
               </label>
               <input
@@ -498,7 +498,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 Email Address
                 {editMode && isFieldChanged('email') && (
-                  <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
+                  <span style={{ fontSize: '11px', backgroundColor: 'var(--white)', color: 'var(--gold-dark)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
                 )}
               </label>
               <input
@@ -522,7 +522,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 Phone Number
                 {editMode && isFieldChanged('phone') && (
-                  <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
+                  <span style={{ fontSize: '11px', backgroundColor: 'var(--white)', color: 'var(--gold-dark)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
                 )}
               </label>
               <input
@@ -541,9 +541,9 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   New Password
-                  <span style={{ fontSize: '11px', backgroundColor: '#f3e5f5', color: '#7b1fa2', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Optional</span>
+                  <span style={{ fontSize: '11px', backgroundColor: 'var(--white)', color: 'var(--info)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Optional</span>
                   {isFieldChanged('password') && (
-                    <span style={{ fontSize: '11px', backgroundColor: '#fff3e0', color: '#e65100', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
+                    <span style={{ fontSize: '11px', backgroundColor: 'var(--white)', color: 'var(--gold-dark)', padding: '2px 8px', borderRadius: '10px', fontWeight: '500' }}>Modified</span>
                   )}
                 </label>
                 <input
@@ -597,14 +597,14 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
 
         {/* Table Success */}
         {tableSuccess && (
-          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#e8f5e9', borderLeft: '4px solid #4caf50', borderRadius: '4px', color: '#2e7d32', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="success-message">
             <span>✅</span><span>{tableSuccess}</span>
           </div>
         )}
 
         {/* Table Error */}
         {tableError && (
-          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className='error-message'>
             <span>⚠️</span><span>{tableError}</span>
           </div>
         )}
@@ -663,7 +663,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <button className="btn btn-primary" onClick={handleAddAdmin} disabled={addLoading}>
                 {addLoading ? (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '14px', height: '14px', border: '2px solid #ffffff40', borderTop: '2px solid #ffffff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    <span style={{ width: '14px', height: '14px', border: '2px solid #ffffff40', borderTop: '2px solid var(--white)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                     Adding...
                   </span>
                 ) : 'Add Admin'}
@@ -695,7 +695,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
             Loading admins...
           </div>
         ) : adminsError ? (
-          <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px' }}>
+          <div className='error-message'>
             ⚠️ {adminsError}
             <button onClick={fetchAllAdmins} style={{ marginLeft: '12px', padding: '4px 12px', border: '1px solid #c62828', borderRadius: '4px', background: 'transparent', color: '#c62828', cursor: 'pointer', fontSize: '12px' }}>
               Retry
@@ -779,7 +779,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
 
                       {/* Role */}
                       <td>
-                        <span style={{ padding: '4px 10px', backgroundColor: '#e3f2fd', color: '#1565c0', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
+                        <span style={{ padding: '4px 10px', backgroundColor: 'var(--gray-200)', color: 'var(--info)', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
                           {admin.role}
                         </span>
                       </td>
@@ -864,12 +864,6 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };

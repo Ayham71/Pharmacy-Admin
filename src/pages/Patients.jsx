@@ -310,14 +310,14 @@ const Patients = () => {
 
         {/* Error Message */}
         {error && (
-          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className='error-message'>
             <span>⚠️</span><span>{error}</span>
           </div>
         )}
 
         {/* Success Message */}
         {success && (
-          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#e8f5e9', borderLeft: '4px solid #4caf50', borderRadius: '4px', color: '#2e7d32', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className='success-message'>
             <span>✅</span><span>{success}</span>
           </div>
         )}
@@ -424,7 +424,7 @@ const Patients = () => {
               <button className="btn btn-primary" onClick={handleAddPatient} disabled={addLoading}>
                 {addLoading ? (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '14px', height: '14px', border: '2px solid #ffffff40', borderTop: '2px solid #ffffff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                    <span style={{ width: '14px', height: '14px', border: '2px solid #ffffff40', borderTop: '2px solid var(--white)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                     Adding...
                   </span>
                 ) : 'Add Patient'}
@@ -455,7 +455,7 @@ const Patients = () => {
             Loading patients...
           </div>
         ) : error && patients.length === 0 ? (
-          <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px' }}>
+          <div className="error-message">
             ⚠️ {error}
             <button onClick={fetchPatients} style={{ marginLeft: '12px', padding: '4px 12px', border: '1px solid #c62828', borderRadius: '4px', background: 'transparent', color: '#c62828', cursor: 'pointer', fontSize: '12px' }}>
               Retry
