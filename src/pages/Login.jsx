@@ -36,6 +36,7 @@ const Login = ({ onLogin }) => {
       });
 
       const data = await response.json();
+      console.log('Login response data:', data);
 
       if (!response.ok) {
         setError(data.message || 'Login failed. Please try again.');
@@ -43,7 +44,6 @@ const Login = ({ onLogin }) => {
         return;
       }
 
-      // Check if token exists
       if (!data.token) {
         setError('No token received from server');
         setLoading(false);
@@ -57,12 +57,21 @@ const Login = ({ onLogin }) => {
         return;
       }
 
-      // Store token and user info in localStorage
+      // Store token and ALL user info in localStorage
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userRole', data.role);
       localStorage.setItem('userEmail', data.email || email);
 
-      // Call onLogin callback to navigate or update app state
+      // Save userId if returned - used in Settings to match profile
+      if (data.id || data.userId || data.adminId || data.Id) {
+        localStorage.setItem('userId', data.id || data.userId || data.adminId || data.Id);
+      }
+
+      // Save username if returned
+      if (data.username || data.userName || data.Username) {
+        localStorage.setItem('userUsername', data.username || data.userName || data.Username);
+      }
+
       onLogin();
     } catch (err) {
       setError('Connection error. Please check your network and try again.');
@@ -78,41 +87,25 @@ const Login = ({ onLogin }) => {
 
   return (
     <div className="page-wrapper">
-      
-
-      {/* Decorative blobs */}
       <div className="glow-blob glow-blob-1"></div>
       <div className="glow-blob glow-blob-2"></div>
 
-      {/* Login Card */}
       <form className="login-card" onSubmit={handleSubmit}>
-        {/* Pharmacy Icon */}
         <div className="icon-wrapper">
           <div className="icon-box">
             <img src="/logo.jpeg" alt="Pharmacy Icon" />
           </div>
         </div>
 
-        {/* Title */}
         <h1 className="card-title">Admin Portal</h1>
         <p className="card-subtitle">Access your professional dashboard</p>
 
-        {/* Error Message */}
         {error && (
-          <div style={{
-            padding: '12px',
-            marginBottom: '16px',
-            backgroundColor: '#ffebee',
-            borderLeft: '4px solid #f44336',
-            borderRadius: '4px',
-            color: '#c62828',
-            fontSize: '14px'
-          }}>
+          <div className="error-message">
             {error}
           </div>
         )}
 
-        {/* Email Field */}
         <div className="form-group">
           <div className="form-label-row">
             <label className="form-label" style={{ fontSize: '12px' }}>EMAIL OR USERNAME</label>
@@ -129,12 +122,11 @@ const Login = ({ onLogin }) => {
               className="text-input"
               placeholder="admin@system.com"
               value={email}
-              onChange={function (e) { setEmail(e.target.value); }}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </div>
         </div>
 
-        {/* Password Field */}
         <div className="form-group">
           <div className="form-label-row">
             <label className="form-label" style={{ fontSize: '12px' }}>PASSWORD</label>
@@ -151,7 +143,7 @@ const Login = ({ onLogin }) => {
               className="text-input"
               placeholder="••••••••••••"
               value={password}
-              onChange={function (e) { setPassword(e.target.value); }}
+              onChange={(e) => setPassword(e.target.value)}
             />
             <button
               type="button"
@@ -175,7 +167,6 @@ const Login = ({ onLogin }) => {
           </div>
         </div>
 
-        {/* Login Button */}
         <button type="submit" className="login-button" disabled={loading}>
           {loading ? (
             <>
@@ -195,7 +186,6 @@ const Login = ({ onLogin }) => {
           )}
         </button>
 
-        {/* SSL Badge */}
         <div className="ssl-badge">
           <svg viewBox="0 0 24 24">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -203,8 +193,6 @@ const Login = ({ onLogin }) => {
           <span className="ssl-text">Secure SSL Encryption Active</span>
         </div>
       </form>
-
-      
     </div>
   );
 }

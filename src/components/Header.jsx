@@ -1,6 +1,6 @@
 import React from 'react'
 
-const Header = ({ adminData }) => {
+const Header = ({ adminData, onNavigate }) => {
   const getPageTitle = () => {
     const path = window.location.hash || 'dashboard'
     const titles = {
@@ -19,16 +19,25 @@ const Header = ({ adminData }) => {
   const username = adminData?.username || 'Admin'
   const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=FFD700&color=fff&size=128`
 
+  const handleAvatarClick = () => {
+    if (onNavigate) {
+      onNavigate('settings')
+    }
+  }
+
   return (
     <header className="header">
       <div className="header-left">
         <h2>System</h2>
       </div>
       <div className="header-right">
-        <img 
-          src={avatarUrl} 
-          alt={username} 
+        <img
+          src={avatarUrl}
+          alt={username}
           className="admin-avatar"
+          onClick={handleAvatarClick}
+          style={{ cursor: 'pointer' }}
+          title="Go to Settings"
         />
       </div>
     </header>

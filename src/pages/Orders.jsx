@@ -22,7 +22,6 @@ const Orders = () => {
       <div className="section">
         <div className="section-header">
           <h3 className="section-title">All Orders</h3>
-          <button className="btn btn-primary">+ Create Order</button>
         </div>
 
         <div className="table-controls">

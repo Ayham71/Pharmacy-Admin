@@ -37,7 +37,52 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
   const [tableSuccess, setTableSuccess] = useState('');
   const [tableError, setTableError] = useState('');
 
-  // Fetch profile admin data
+  // Helper: decode JWT to get current user's email or id
+  const getLoggedInUserInfo = () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) return null;
+
+      // JWT is 3 parts separated by dots - decode the payload (part 2)
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+
+      // Decode base64
+      const decoded = JSON.parse(atob(payload));
+      console.log('Decoded JWT payload:', decoded);
+
+      // Common JWT claim fields for email/username/id
+      const email =
+        decoded.email ||
+        decoded.Email ||
+        decoded['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] ||
+        decoded.sub ||
+        null;
+
+      const id =
+        decoded.id ||
+        decoded.Id ||
+        decoded.userId ||
+        decoded.UserId ||
+        decoded.adminId ||
+        decoded['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] ||
+        null;
+
+      const username =
+        decoded.username ||
+        decoded.Username ||
+        decoded.unique_name ||
+        decoded['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] ||
+        null;
+
+      return { email, id, username };
+    } catch (e) {
+      console.error('Failed to decode JWT:', e);
+      return null;
+    }
+  };
+
+  // Fetch profile admin data - match with logged in user
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
@@ -47,6 +92,10 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
           setFetchLoading(false);
           return;
         }
+
+        // Get logged in user info from JWT
+        const loggedInUser = getLoggedInUserInfo();
+        console.log('Logged in user from JWT:', loggedInUser);
 
         const response = await fetch('http://165.22.91.187:5000/api/Admin', {
           method: 'GET',
@@ -73,29 +122,79 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
           return;
         }
 
-        const adminInfo = Array.isArray(data) ? data[0] : data;
+        console.log('All admins data:', data);
+
+        // Normalize to array
+        const adminsList = Array.isArray(data) ? data : [data];
+
+        // Find the logged-in admin by matching JWT claims
+        let currentAdmin = null;
+
+        if (loggedInUser) {
+          // Try to match by id first
+          if (loggedInUser.id) {
+            currentAdmin = adminsList.find(a =>
+              String(a.id) === String(loggedInUser.id) ||
+              String(a.Id) === String(loggedInUser.id) ||
+              String(a.adminId) === String(loggedInUser.id) ||
+              String(a.userId) === String(loggedInUser.id)
+            );
+          }
+
+          // Try to match by email if id didn't work
+          if (!currentAdmin && loggedInUser.email) {
+            currentAdmin = adminsList.find(a =>
+              (a.email || a.Email || '')?.toLowerCase() === loggedInUser.email.toLowerCase()
+            );
+          }
+
+          // Try to match by username if email didn't work
+          if (!currentAdmin && loggedInUser.username) {
+            currentAdmin = adminsList.find(a =>
+              (a.username || a.userName || a.Username || '')?.toLowerCase() === loggedInUser.username.toLowerCase()
+            );
+          }
+        }
+
+        // Also try matching with stored email from login
+        if (!currentAdmin) {
+          const storedEmail = localStorage.getItem('userEmail');
+          if (storedEmail) {
+            currentAdmin = adminsList.find(a =>
+              (a.email || a.Email || '')?.toLowerCase() === storedEmail.toLowerCase()
+            );
+          }
+        }
+
+        // Fallback to first admin if no match found
+        if (!currentAdmin) {
+          console.warn('Could not match logged-in user, using first admin as fallback');
+          currentAdmin = adminsList[0];
+        }
+
+        console.log('Matched current admin:', currentAdmin);
 
         const username =
-          adminInfo.username || adminInfo.userName || adminInfo.UserName ||
-          adminInfo.Username || adminInfo.user_name || '';
+          currentAdmin.username || currentAdmin.userName || currentAdmin.UserName ||
+          currentAdmin.Username || currentAdmin.user_name || '';
 
         const email =
-          adminInfo.email || adminInfo.Email ||
-          adminInfo.emailAddress || adminInfo.EmailAddress || '';
+          currentAdmin.email || currentAdmin.Email ||
+          currentAdmin.emailAddress || currentAdmin.EmailAddress || '';
 
         const phone =
-          adminInfo.phone || adminInfo.Phone ||
-          adminInfo.phoneNumber || adminInfo.PhoneNumber ||
-          adminInfo.phone_number || '';
+          currentAdmin.phone || currentAdmin.Phone ||
+          currentAdmin.phoneNumber || currentAdmin.PhoneNumber ||
+          currentAdmin.phone_number || '';
 
         const role =
-          adminInfo.role || adminInfo.Role ||
-          adminInfo.userRole || adminInfo.UserRole || 'System Administrator';
+          currentAdmin.role || currentAdmin.Role ||
+          currentAdmin.userRole || currentAdmin.UserRole || 'System Administrator';
 
         const id =
-          adminInfo.id || adminInfo.Id ||
-          adminInfo.adminId || adminInfo.AdminId ||
-          adminInfo.userId || adminInfo.UserId || null;
+          currentAdmin.id || currentAdmin.Id ||
+          currentAdmin.adminId || currentAdmin.AdminId ||
+          currentAdmin.userId || currentAdmin.UserId || null;
 
         const fetchedData = { email, username, phone, role, password: '' };
 
@@ -105,6 +204,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
         onUpdateAdmin({ email, username, phone, role });
 
       } catch (err) {
+        console.error('Error fetching admin data:', err);
         setError('Connection error. Please check your network and try again.');
       } finally {
         setFetchLoading(false);
@@ -151,7 +251,6 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
         return;
       }
 
-      // Normalize to array
       const adminsList = Array.isArray(data) ? data : [data];
 
       const normalized = adminsList.map((a) => ({
@@ -212,7 +311,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
 
       const response = await fetch(`http://165.22.91.187:5000/api/Admin/${adminId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('authToken')}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(requestData)
       });
 
@@ -319,7 +418,6 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
         return;
       }
 
-      // Update local state
       setAdmins(prev => prev.map(a =>
         a.id === adminToSave.id
           ? { ...a, email: editAdminForm.email || a.email, username: editAdminForm.username || a.username, phone: editAdminForm.phone || a.phone }
@@ -595,14 +693,12 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
           </button>
         </div>
 
-        {/* Table Success */}
         {tableSuccess && (
           <div className="success-message">
             <span>✅</span><span>{tableSuccess}</span>
           </div>
         )}
 
-        {/* Table Error */}
         {tableError && (
           <div className='error-message'>
             <span>⚠️</span><span>{tableError}</span>
@@ -616,47 +712,19 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Username <span style={{ color: 'red' }}>*</span></label>
-                <input
-                  type="text"
-                  value={newAdmin.username}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })}
-                  className="form-input"
-                  placeholder="Enter username"
-                  style={{ width: '100%' }}
-                />
+                <input type="text" value={newAdmin.username} onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })} className="form-input" placeholder="Enter username" style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Email <span style={{ color: 'red' }}>*</span></label>
-                <input
-                  type="email"
-                  value={newAdmin.email}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
-                  className="form-input"
-                  placeholder="Enter email address"
-                  style={{ width: '100%' }}
-                />
+                <input type="email" value={newAdmin.email} onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })} className="form-input" placeholder="Enter email address" style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Phone</label>
-                <input
-                  type="text"
-                  value={newAdmin.phone}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value.replace(/\D/g, '') })}
-                  className="form-input"
-                  placeholder="Numbers only"
-                  style={{ width: '100%' }}
-                />
+                <input type="text" value={newAdmin.phone} onChange={(e) => setNewAdmin({ ...newAdmin, phone: e.target.value.replace(/\D/g, '') })} className="form-input" placeholder="Numbers only" style={{ width: '100%' }} />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Password <span style={{ color: 'red' }}>*</span></label>
-                <input
-                  type="password"
-                  value={newAdmin.password}
-                  onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                  className="form-input"
-                  placeholder="Enter password"
-                  style={{ width: '100%' }}
-                />
+                <input type="password" value={newAdmin.password} onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })} className="form-input" placeholder="Enter password" style={{ width: '100%' }} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
@@ -680,20 +748,13 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
             </svg>
-            <input
-              type="text"
-              placeholder="Search by username or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+            <input type="text" placeholder="Search by username or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
         </div>
 
         {/* Table */}
         {adminsLoading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
-            Loading admins...
-          </div>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>Loading admins...</div>
         ) : adminsError ? (
           <div className='error-message'>
             ⚠️ {adminsError}
@@ -723,93 +784,41 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
                 ) : (
                   filteredAdmins.map((admin) => (
                     <tr key={admin.id}>
-
-                      {/* Username */}
                       <td>
                         {editingAdminId === admin.id ? (
-                          <input
-                            type="text"
-                            value={editAdminForm.username || ''}
-                            onChange={(e) => setEditAdminForm({ ...editAdminForm, username: e.target.value })}
-                            className="form-input"
-                            style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
-                          />
+                          <input type="text" value={editAdminForm.username || ''} onChange={(e) => setEditAdminForm({ ...editAdminForm, username: e.target.value })} className="form-input" style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
                         ) : (
                           <div className="driver-info">
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(admin.username || 'A')}&background=FFC107&color=fff`}
-                              alt={admin.username}
-                              className="driver-avatar"
-                            />
+                            <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(admin.username || 'A')}&background=FFC107&color=fff`} alt={admin.username} className="driver-avatar" />
                             <span className="order-id">{admin.username}</span>
                           </div>
                         )}
                       </td>
-
-                      {/* Email */}
                       <td>
                         {editingAdminId === admin.id ? (
-                          <input
-                            type="email"
-                            value={editAdminForm.email || ''}
-                            onChange={(e) => setEditAdminForm({ ...editAdminForm, email: e.target.value })}
-                            className="form-input"
-                            style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
-                          />
+                          <input type="email" value={editAdminForm.email || ''} onChange={(e) => setEditAdminForm({ ...editAdminForm, email: e.target.value })} className="form-input" style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
                         ) : (
                           admin.email
                         )}
                       </td>
-
-                      {/* Phone */}
                       <td>
                         {editingAdminId === admin.id ? (
-                          <input
-                            type="text"
-                            value={editAdminForm.phone || ''}
-                            onChange={(e) => setEditAdminForm({ ...editAdminForm, phone: e.target.value.replace(/\D/g, '') })}
-                            className="form-input"
-                            placeholder="Numbers only"
-                            style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }}
-                          />
+                          <input type="text" value={editAdminForm.phone || ''} onChange={(e) => setEditAdminForm({ ...editAdminForm, phone: e.target.value.replace(/\D/g, '') })} className="form-input" placeholder="Numbers only" style={{ width: '100%', padding: '8px', border: '1px solid var(--gray-300)', borderRadius: '4px' }} />
                         ) : (
                           admin.phone || '—'
                         )}
                       </td>
-
-                      {/* Role */}
                       <td>
                         <span style={{ padding: '4px 10px', backgroundColor: 'var(--gray-200)', color: 'var(--info)', borderRadius: '12px', fontSize: '12px', fontWeight: '500' }}>
                           {admin.role}
                         </span>
                       </td>
-
-                      {/* Password field only when editing */}
-                      {editingAdminId === admin.id && (
-                        <td colSpan="0" style={{ display: 'none' }} />
-                      )}
-
-                      {/* Actions */}
                       <td>
                         {editingAdminId === admin.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            <div>
-                              <input
-                                type="password"
-                                value={editAdminForm.password || ''}
-                                onChange={(e) => setEditAdminForm({ ...editAdminForm, password: e.target.value })}
-                                className="form-input"
-                                placeholder="New password (optional)"
-                                style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--gray-300)', borderRadius: '4px', marginBottom: '6px', fontSize: '13px' }}
-                              />
-                            </div>
+                            <input type="password" value={editAdminForm.password || ''} onChange={(e) => setEditAdminForm({ ...editAdminForm, password: e.target.value })} className="form-input" placeholder="New password (optional)" style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--gray-300)', borderRadius: '4px', marginBottom: '6px', fontSize: '13px' }} />
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              <button
-                                className="action-btn"
-                                title="Save"
-                                onClick={() => handleSaveAdmin(admin)}
-                                disabled={editLoading}
-                              >
+                              <button className="action-btn" title="Save" onClick={() => handleSaveAdmin(admin)} disabled={editLoading}>
                                 {editLoading ? (
                                   <span style={{ width: '14px', height: '14px', border: '2px solid #ccc', borderTop: '2px solid #333', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                                 ) : (
@@ -836,12 +845,7 @@ const Settings = ({ adminData, onUpdateAdmin }) => {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                               </svg>
                             </button>
-                            <button
-                              className="action-btn delete-btn"
-                              title="Delete"
-                              onClick={() => handleDeleteAdmin(admin.id)}
-                              disabled={deleteLoadingId === admin.id}
-                            >
+                            <button className="action-btn delete-btn" title="Delete" onClick={() => handleDeleteAdmin(admin.id)} disabled={deleteLoadingId === admin.id}>
                               {deleteLoadingId === admin.id ? (
                                 <span style={{ width: '14px', height: '14px', border: '2px solid #ccc', borderTop: '2px solid #f44336', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                               ) : (
