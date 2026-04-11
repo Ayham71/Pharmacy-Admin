@@ -346,8 +346,8 @@ const Orders = () => {
                             gap: '6px',
                             padding: '5px 12px',
                             backgroundColor: expandedMedicines[order.id] ? '#fff3e0' : '#f3f4f6',
-                            color: expandedMedicines[order.id] ? '#e65100' : '#374151',
-                            border: `1px solid ${expandedMedicines[order.id] ? '#ffb74d' : '#d1d5db'}`,
+                            color: expandedMedicines[order.id] ? 'var(--warning)' : '#374151',
+                            border: `1px solid ${expandedMedicines[order.id] ? 'var(--warning)' : '#d1d5db'}`,
                             borderRadius: '20px',
                             cursor: 'pointer',
                             fontSize: '12px',
@@ -485,10 +485,10 @@ const Orders = () => {
                             {/* Header */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e65100" strokeWidth="2">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
                                   <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
                                 </svg>
-                                <span style={{ fontWeight: '600', fontSize: '14px', color: '#e65100' }}>
+                                <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--warning)' }}>
                                   Medicines in {order.id}
                                 </span>
                               </div>
@@ -497,7 +497,7 @@ const Orders = () => {
                               {editingId === order.id && (
                                 <button
                                   onClick={handleAddMedicineRow}
-                                  style={{ padding: '4px 12px', backgroundColor: '#4caf50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
+                                  style={{ padding: '4px 12px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
                                 >
                                   + Add Medicine
                                 </button>
@@ -508,12 +508,12 @@ const Orders = () => {
                             <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
                               <thead>
                                 <tr style={{ backgroundColor: '#fff3e0' }}>
-                                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: '#e65100', borderBottom: '1px solid #ffe0b2' }}>Medicine Name</th>
-                                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: '#e65100', borderBottom: '1px solid #ffe0b2' }}>Quantity</th>
-                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: '#e65100', borderBottom: '1px solid #ffe0b2' }}>Unit Price</th>
-                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: '#e65100', borderBottom: '1px solid #ffe0b2' }}>Subtotal</th>
+                                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Medicine Name</th>
+                                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Quantity</th>
+                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Unit Price</th>
+                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Subtotal</th>
                                   {editingId === order.id && (
-                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: '#e65100', borderBottom: '1px solid #ffe0b2' }}>Remove</th>
+                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Remove</th>
                                   )}
                                 </tr>
                               </thead>
@@ -580,7 +580,7 @@ const Orders = () => {
 
                                       {/* Subtotal */}
                                       <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px' }}>
-                                        <span style={{ fontWeight: '700', color: '#2e7d32' }}>
+                                        <span style={{ fontWeight: '700', color: 'var(--success)' }}>
                                           ${subtotal}
                                         </span>
                                       </td>
@@ -590,7 +590,7 @@ const Orders = () => {
                                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                                           <button
                                             onClick={() => handleRemoveMedicineRow(index)}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f44336', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
                                             title="Remove medicine"
                                           >
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -610,10 +610,10 @@ const Orders = () => {
                               {/* Total Footer */}
                               <tfoot>
                                 <tr style={{ backgroundColor: '#fff3e0', borderTop: '2px solid #ffe0b2' }}>
-                                  <td colSpan={editingId === order.id ? 3 : 3} style={{ padding: '10px 14px', fontWeight: '600', fontSize: '13px', color: '#e65100' }}>
+                                  <td colSpan={editingId === order.id ? 3 : 3} style={{ padding: '10px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--warning)' }}>
                                     Total ({(editingId === order.id ? editForm.medicines : order.medicines)?.length || 0} items)
                                   </td>
-                                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', fontSize: '14px', color: '#2e7d32' }}>
+                                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', fontSize: '14px', color: 'var(--success)' }}>
                                     ${(editingId === order.id ? editForm.medicines : order.medicines)
                                       ?.reduce((sum, m) => {
                                         const price = parseFloat((m.price || '$0').replace('$', '')) || 0
