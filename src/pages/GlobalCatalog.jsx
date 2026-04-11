@@ -4,11 +4,11 @@ const GlobalCatalog = ({ categories, setCategories }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedCategories, setExpandedCategories] = useState({})
   const [addingToCategory, setAddingToCategory] = useState(null)
-  const [newMedicine, setNewMedicine] = useState({ name: '', price: '', image: null, imagePreview: '' })
+  const [newMedicine, setNewMedicine] = useState({ name: '', description: '', price: '', image: null, imagePreview: '' })
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryData, setNewCategoryData] = useState({ name: '', icon: '💊' })
   const [editingMedicine, setEditingMedicine] = useState(null)
-  const [editMedicineForm, setEditMedicineForm] = useState({ name: '', price: '', image: null, imagePreview: '' })
+  const [editMedicineForm, setEditMedicineForm] = useState({ name: '', description: '', price: '', image: null, imagePreview: '' })
 
   // Load categories from localStorage on mount
   useEffect(() => {
@@ -29,7 +29,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
       try {
         localStorage.setItem('catalogCategories', JSON.stringify(categories))
       } catch (e) {
-        // localStorage might be full due to large base64 images
         console.error('Failed to save catalog to localStorage:', e)
       }
     }
@@ -48,14 +47,13 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
   const addMedicine = (categoryId) => {
     setAddingToCategory(categoryId)
-    setNewMedicine({ name: '', price: '', image: null, imagePreview: '' })
+    setNewMedicine({ name: '', description: '', price: '', image: null, imagePreview: '' })
   }
 
   const handleNewMedicineImage = (e) => {
     const file = e.target.files[0]
     if (!file) return
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert('Image size must be less than 2MB to be saved properly.')
       return
@@ -72,7 +70,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     const file = e.target.files[0]
     if (!file) return
 
-    // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       alert('Image size must be less than 2MB to be saved properly.')
       return
@@ -98,10 +95,10 @@ const GlobalCatalog = ({ categories, setCategories }) => {
           medicines: [
             ...cat.medicines,
             {
-              name: newMedicine.name,
-              price: `$${newMedicine.price}`,
-              // Save base64 string directly - persists in localStorage
-              image: newMedicine.imagePreview || null
+              name:        newMedicine.name,
+              description: newMedicine.description.trim(),
+              price:       `$${newMedicine.price}`,
+              image:       newMedicine.imagePreview || null
             }
           ]
         }
@@ -110,7 +107,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     })
 
     setCategories(updatedCategories)
-    // Immediately save to localStorage
     try {
       localStorage.setItem('catalogCategories', JSON.stringify(updatedCategories))
     } catch (e) {
@@ -118,15 +114,16 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
 
     setAddingToCategory(null)
-    setNewMedicine({ name: '', price: '', image: null, imagePreview: '' })
+    setNewMedicine({ name: '', description: '', price: '', image: null, imagePreview: '' })
   }
 
   const handleEditMedicine = (medicine) => {
     setEditingMedicine(medicine.name)
     setEditMedicineForm({
-      name: medicine.name,
-      price: medicine.price.replace('$', ''),
-      image: null,
+      name:        medicine.name,
+      description: medicine.description || '',
+      price:       medicine.price.replace('$', ''),
+      image:       null,
       imagePreview: medicine.image || ''
     })
   }
@@ -145,10 +142,10 @@ const GlobalCatalog = ({ categories, setCategories }) => {
             m.name === medicineName
               ? {
                   ...m,
-                  name: editMedicineForm.name,
-                  price: `$${editMedicineForm.price}`,
-                  // Keep old image if no new one uploaded
-                  image: editMedicineForm.imagePreview || m.image
+                  name:        editMedicineForm.name,
+                  description: editMedicineForm.description.trim(),
+                  price:       `$${editMedicineForm.price}`,
+                  image:       editMedicineForm.imagePreview || m.image
                 }
               : m
           )
@@ -158,7 +155,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     })
 
     setCategories(updatedCategories)
-    // Immediately save to localStorage
     try {
       localStorage.setItem('catalogCategories', JSON.stringify(updatedCategories))
     } catch (e) {
@@ -166,7 +162,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
 
     setEditingMedicine(null)
-    setEditMedicineForm({ name: '', price: '', image: null, imagePreview: '' })
+    setEditMedicineForm({ name: '', description: '', price: '', image: null, imagePreview: '' })
   }
 
   const deleteMedicine = (categoryId, medicineName) => {
@@ -197,9 +193,9 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
 
     const newCategory = {
-      id: Math.max(...categories.map(c => c.id), 0) + 1,
-      name: newCategoryData.name,
-      icon: newCategoryData.icon,
+      id:        Math.max(...categories.map(c => c.id), 0) + 1,
+      name:      newCategoryData.name,
+      icon:      newCategoryData.icon,
       medicines: []
     }
 
@@ -245,13 +241,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
         {/* Add Category Form */}
         {addingCategory && (
-          <div style={{
-            padding: '16px',
-            backgroundColor: '#f9f9f9',
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            marginBottom: '16px'
-          }}>
+          <div style={{ padding: '16px', backgroundColor: '#f9f9f9', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '16px' }}>
             <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600' }}>Add New Category</h4>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
               <div style={{ flex: 1 }}>
@@ -263,14 +253,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                   placeholder="Enter category name"
                   value={newCategoryData.name}
                   onChange={(e) => setNewCategoryData({ ...newCategoryData, name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    boxSizing: 'border-box',
-                    fontSize: '14px'
-                  }}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
                 />
               </div>
               <div>
@@ -316,16 +299,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
               {/* Category Header */}
               <div
                 onClick={() => toggleCategory(category.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  backgroundColor: '#f5f5f5',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                  transition: 'background-color 0.2s'
-                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: '#f5f5f5', cursor: 'pointer', userSelect: 'none', transition: 'background-color 0.2s' }}
                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e8e8e8'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
               >
@@ -358,6 +332,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                       <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Photo</th>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Medicine Name</th>
+                        <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Description / Composition</th>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Price</th>
                         <th style={{ textAlign: 'center', padding: '8px', fontWeight: '600', color: '#333' }}>Actions</th>
                       </tr>
@@ -408,6 +383,27 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                             />
                           </td>
 
+                          {/* Description Input */}
+                          <td style={{ padding: '12px 8px' }}>
+                            <textarea
+                              placeholder="Enter composition or description (optional)"
+                              value={newMedicine.description}
+                              onChange={(e) => setNewMedicine({ ...newMedicine, description: e.target.value })}
+                              rows={3}
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                boxSizing: 'border-box',
+                                resize: 'vertical',
+                                fontSize: '13px',
+                                fontFamily: 'inherit',
+                                minHeight: '60px'
+                              }}
+                            />
+                          </td>
+
                           {/* Price Input */}
                           <td style={{ padding: '12px 8px' }}>
                             <input
@@ -429,7 +425,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                                 Save
                               </button>
                               <button
-                                onClick={() => { setAddingToCategory(null); setNewMedicine({ name: '', price: '', image: null, imagePreview: '' }) }}
+                                onClick={() => { setAddingToCategory(null); setNewMedicine({ name: '', description: '', price: '', image: null, imagePreview: '' }) }}
                                 style={{ padding: '4px 12px', backgroundColor: '#999', color: 'var(--white)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                               >
                                 Cancel
@@ -501,6 +497,48 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                               )}
                             </td>
 
+                            {/* Description */}
+                            <td style={{ padding: '12px 8px' }}>
+                              {editingMedicine === medicine.name ? (
+                                <textarea
+                                  value={editMedicineForm.description}
+                                  onChange={(e) => setEditMedicineForm({ ...editMedicineForm, description: e.target.value })}
+                                  placeholder="Enter composition or description (optional)"
+                                  rows={3}
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    boxSizing: 'border-box',
+                                    resize: 'vertical',
+                                    fontSize: '13px',
+                                    fontFamily: 'inherit',
+                                    minHeight: '60px'
+                                  }}
+                                />
+                              ) : (
+                                medicine.description ? (
+                                  <span style={{
+                                    fontSize: '13px',
+                                    color: '#555',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 3,
+                                    WebkitBoxOrient: 'vertical',
+                                    overflow: 'hidden',
+                                    lineHeight: '1.4',
+                                    maxWidth: '220px'
+                                  }}>
+                                    {medicine.description}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '12px', color: '#bbb', fontStyle: 'italic' }}>
+                                    No description
+                                  </span>
+                                )
+                              )}
+                            </td>
+
                             {/* Price */}
                             <td style={{ padding: '12px 8px' }}>
                               {editingMedicine === medicine.name ? (
@@ -529,7 +567,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                                     Save
                                   </button>
                                   <button
-                                    onClick={() => { setEditingMedicine(null); setEditMedicineForm({ name: '', price: '', image: null, imagePreview: '' }) }}
+                                    onClick={() => { setEditingMedicine(null); setEditMedicineForm({ name: '', description: '', price: '', image: null, imagePreview: '' }) }}
                                     style={{ padding: '4px 12px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                                   >
                                     Cancel
@@ -556,7 +594,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="4" style={{ padding: '12px', textAlign: 'center', color: '#999' }}>
+                          <td colSpan="5" style={{ padding: '12px', textAlign: 'center', color: '#999' }}>
                             No medicines in this category
                           </td>
                         </tr>

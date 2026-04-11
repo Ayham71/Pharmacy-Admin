@@ -10,6 +10,7 @@ import Orders from './pages/Orders'
 import Finance from './pages/Finance'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
+import Admins from './pages/Admins'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard')
@@ -22,11 +23,9 @@ function App() {
     avatar: 'https://ui-avatars.com/api/?name=Admin&background=FFD700&color=fff'
   })
 
-  // Check if user is logged in on app startup
   useEffect(() => {
     const token = localStorage.getItem('authToken');
     const userRole = localStorage.getItem('userRole');
-
     if (token && userRole === 'admin') {
       setIsLoggedIn(true);
     } else {
@@ -35,85 +34,64 @@ function App() {
     }
   }, []);
 
-  // Load categories from localStorage first, fallback to default data
   const [categories, setCategories] = useState(() => {
     try {
       const saved = localStorage.getItem('catalogCategories')
-      if (saved) {
-        return JSON.parse(saved)
-      }
+      if (saved) return JSON.parse(saved)
     } catch (e) {
       console.error('Failed to load catalog from localStorage:', e)
     }
-
-    // Default data if nothing saved in localStorage
     return [
       {
-        id: 1,
-        name: 'Painkillers',
-        icon: '💊',
+        id: 1, name: 'Painkillers', icon: '💊',
         medicines: [
           { name: 'Paracetamol 500mg', price: '$5.99', image: null },
-          { name: 'Ibuprofen 400mg', price: '$4.50', image: null },
-          { name: 'Aspirin 100mg', price: '$3.99', image: null },
+          { name: 'Ibuprofen 400mg',   price: '$4.50', image: null },
+          { name: 'Aspirin 100mg',     price: '$3.99', image: null },
         ]
       },
       {
-        id: 2,
-        name: 'Chronic Meds',
-        icon: '💉',
+        id: 2, name: 'Chronic Meds', icon: '💉',
         medicines: [
           { name: 'Insulin Glargine', price: '$89.00', image: null },
-          { name: 'Metformin 500mg', price: '$12.99', image: null },
+          { name: 'Metformin 500mg',  price: '$12.99', image: null },
         ]
       },
       {
-        id: 3,
-        name: 'Baby Care',
-        icon: '🍼',
+        id: 3, name: 'Baby Care', icon: '🍼',
         medicines: [
           { name: 'Baby Powder', price: '$6.99', image: null },
-          { name: 'Baby Oil', price: '$7.50', image: null },
+          { name: 'Baby Oil',    price: '$7.50', image: null },
         ]
       },
       {
-        id: 4,
-        name: 'Supplements',
-        icon: '🌿',
+        id: 4, name: 'Supplements', icon: '🌿',
         medicines: [
           { name: 'Vitamin D3', price: '$9.99', image: null },
         ]
       },
       {
-        id: 5,
-        name: 'Antibiotics',
-        icon: '🔬',
+        id: 5, name: 'Antibiotics', icon: '🔬',
         medicines: [
-          { name: 'Amoxicillin 250mg', price: '$12.50', image: null },
+          { name: 'Amoxicillin 250mg',  price: '$12.50', image: null },
           { name: 'Azithromycin 500mg', price: '$15.99', image: null },
         ]
       },
       {
-        id: 6,
-        name: 'First Aid',
-        icon: '🩹',
+        id: 6, name: 'First Aid', icon: '🩹',
         medicines: [
           { name: 'Bandages Pack', price: '$2.99', image: null },
         ]
       },
       {
-        id: 7,
-        name: 'Vitamins',
-        icon: '💪',
+        id: 7, name: 'Vitamins', icon: '💪',
         medicines: [
-          { name: 'Vitamin C 1000mg', price: '$8.99', image: null },
+          { name: 'Vitamin C 1000mg',  price: '$8.99',  image: null },
           { name: 'Vitamin B Complex', price: '$10.50', image: null },
         ]
       },
       {
-        id: 8,
-        name: 'Skin Care',
-        icon: '✨',
+        id: 8, name: 'Skin Care', icon: '✨',
         medicines: [
           { name: 'Face Cream SPF30', price: '$22.99', image: null },
         ]
@@ -123,6 +101,7 @@ function App() {
 
   const handleLogin = () => {
     setIsLoggedIn(true)
+    setCurrentPage('dashboard')
   }
 
   const handleLogout = () => {
@@ -137,31 +116,38 @@ function App() {
     setAdminData(updatedData)
   }
 
+  // Debug - log every page change
+  useEffect(() => {
+    console.log('Current page changed to:', currentPage)
+  }, [currentPage])
+
   const renderPage = () => {
+    console.log('Rendering page:', currentPage)
+
     if (!isLoggedIn) {
       return <Login onLogin={handleLogin} />
     }
 
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard setCurrentPage={setCurrentPage} categories={categories} />
-      case 'catalog':
-        return <GlobalCatalog categories={categories} setCategories={setCategories} />
-      case 'pharmacies':
-        return <Pharmacies />
-      case 'drivers':
-        return <Drivers />
-      case 'patients':
-        return <Patients />
-      case 'orders':
-        return <Orders />
-      case 'finance':
-        return <Finance />
-      case 'settings':
-        return <Settings adminData={adminData} onUpdateAdmin={handleUpdateAdmin} />
-      default:
-        return <Dashboard setCurrentPage={setCurrentPage} categories={categories} />
-    }
+    if (currentPage === 'dashboard') 
+       return <Dashboard setCurrentPage={setCurrentPage} categories={categories} />
+    if (currentPage === 'catalog')    
+      return <GlobalCatalog categories={categories} setCategories={setCategories} />
+    if (currentPage === 'pharmacies') 
+      return <Pharmacies />
+    if (currentPage === 'drivers')    
+      return <Drivers />
+    if (currentPage === 'patients')   
+      return <Patients />
+    if (currentPage === 'admins')     
+      return <Admins />
+    if (currentPage === 'orders')     
+      return <Orders />
+    if (currentPage === 'finance')    
+      return <Finance />
+    if (currentPage === 'settings')   
+      return <Settings adminData={adminData} onUpdateAdmin={handleUpdateAdmin} />
+
+    return <Dashboard setCurrentPage={setCurrentPage} categories={categories} />
   }
 
   return (
@@ -169,7 +155,10 @@ function App() {
       {isLoggedIn && (
         <Sidebar
           currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
+          setCurrentPage={(page) => {
+            console.log('Sidebar setting page to:', page)
+            setCurrentPage(page)
+          }}
           onLogout={handleLogout}
         />
       )}
