@@ -1,7 +1,15 @@
-import React, { useState, useCallback } from 'react'
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api'
+import React, { useState, useCallback, useEffect } from 'react'
+import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api'
+
+const libraries = ['places']
 
 const MapPicker = ({ latitude, longitude, onLocationChange, height = '400px' }) => {
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: "AIzaSyAlvXFMVj5f63VgSfj2kqyt7_88sd0o43A",
+    libraries: libraries
+  })
+
   const [markerPosition, setMarkerPosition] = useState({
     lat: parseFloat(latitude) || 31.9539,
     lng: parseFloat(longitude) || 35.9106
@@ -11,6 +19,18 @@ const MapPicker = ({ latitude, longitude, onLocationChange, height = '400px' }) 
     lat: parseFloat(latitude) || 31.9539,
     lng: parseFloat(longitude) || 35.9106
   })
+
+  // Update marker when props change
+  useEffect(() => {
+    if (latitude && longitude) {
+      const newLat = parseFloat(latitude)
+      const newLng = parseFloat(longitude)
+      if (!isNaN(newLat) && !isNaN(newLng)) {
+        setMarkerPosition({ lat: newLat, lng: newLng })
+        setMapCenter({ lat: newLat, lng: newLng })
+      }
+    }
+  }, [latitude, longitude])
 
   const mapContainerStyle = {
     width: '100%',
@@ -46,28 +66,42 @@ const MapPicker = ({ latitude, longitude, onLocationChange, height = '400px' }) 
     }
   }, [onLocationChange])
 
+  if (!isLoaded) {
+    return (
+      <div style={{ 
+        width: '100%', 
+        height: height, 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        backgroundColor: '#f5f5f5',
+        borderRadius: '8px'
+      }}>
+        <p style={{ color: '#999' }}>Loading map...</p>
+      </div>
+    )
+  }
+
   return (
     <div style={{ width: '100%' }}>
-      <LoadScript googleMapsApiKey="AIzaSyAlvXFMVj5f63VgSfj2kqyt7_88sd0o43A">
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={mapCenter}
-          zoom={13}
-          onClick={handleMapClick}
-          options={{
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: true,
-          }}
-        >
-          <Marker
-            position={markerPosition}
-            draggable={true}
-            onDragEnd={handleMarkerDragEnd}
-            animation={window.google?.maps?.Animation?.DROP}
-          />
-        </GoogleMap>
-      </LoadScript>
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={mapCenter}
+        zoom={13}
+        onClick={handleMapClick}
+        options={{
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: true,
+          zoomControl: true,
+        }}
+      >
+        <Marker
+          position={markerPosition}
+          draggable={true}
+          onDragEnd={handleMarkerDragEnd}
+        />
+      </GoogleMap>
       
       <div style={{ 
         marginTop: '12px', 
