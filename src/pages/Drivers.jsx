@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import MapPicker from '../components/MapPicker'
 
 const BASE_URL = 'http://165.22.91.187:5000/api/Admin/Delivery'
 
@@ -638,42 +639,23 @@ const Drivers = () => {
                 />
               </div>
 
-              {/* Latitude */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                  Latitude <span style={{ color: 'red' }}>*</span>
+              {/* Location Map Picker */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                  Driver Location <span style={{ color: 'red' }}>*</span>
                 </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={newDriver.latitude}
-                  onChange={(e) => setNewDriver({ ...newDriver, latitude: e.target.value })}
-                  className="form-input"
-                  placeholder="e.g. 31.9539"
-                  style={{ width: '100%' }}
+                <MapPicker
+                latitude={newDriver.latitude}
+                longitude={newDriver.longitude}
+                onLocationChange={(lat, lng) => {
+                setNewDriver({
+                ...newDriver,
+                latitude: lat.toString(),
+                longitude: lng.toString()
+                })
+                }}
+                height="350px"
                 />
-                <small style={{ color: 'var(--medium-gray)', display: 'block', marginTop: '2px', fontSize: '11px' }}>
-                  Between -90 and 90
-                </small>
-              </div>
-
-              {/* Longitude */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                  Longitude <span style={{ color: 'red' }}>*</span>
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  value={newDriver.longitude}
-                  onChange={(e) => setNewDriver({ ...newDriver, longitude: e.target.value })}
-                  className="form-input"
-                  placeholder="e.g. 35.9106"
-                  style={{ width: '100%' }}
-                />
-                <small style={{ color: 'var(--medium-gray)', display: 'block', marginTop: '2px', fontSize: '11px' }}>
-                  Between -180 and 180
-                </small>
               </div>
 
             </div>
@@ -876,32 +858,36 @@ const Drivers = () => {
                       {/* Location */}
                       <td>
                         {editingId === driver.id ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <input
-                              type="number"
-                              step="any"
-                              value={editForm.latitude || ''}
-                              onChange={(e) => handleInputChange('latitude', e.target.value)}
-                              className="form-input"
-                              placeholder="Latitude"
-                              style={inputStyle}
-                            />
-                            <input
-                              type="number"
-                              step="any"
-                              value={editForm.longitude || ''}
-                              onChange={(e) => handleInputChange('longitude', e.target.value)}
-                              className="form-input"
-                              placeholder="Longitude"
-                              style={inputStyle}
-                            />
-                          </div>
+                        <div style={{ minWidth: '350px' }}>
+                          <MapPicker
+                            latitude={editForm.latitude}
+                            longitude={editForm.longitude}
+                            onLocationChange={(lat, lng) => {
+                            setEditForm({
+                            ...editForm,
+                            latitude: lat.toString(),
+                            longitude: lng.toString()
+                            })
+                            }}
+                            height="280px"
+                          />
+                        </div>
                         ) : (
-                          driver.latitude && driver.longitude ? (
-                            <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
-                              {parseFloat(driver.latitude).toFixed(4)}, {parseFloat(driver.longitude).toFixed(4)}
-                            </span>
-                          ) : '—'
+                        driver.latitude && driver.longitude ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
+                            📍 {parseFloat(driver.latitude).toFixed(4)}, {parseFloat(driver.longitude).toFixed(4)}
+                          </span>
+                          <a
+                          href={`https://www.google.com/maps?q=${driver.latitude},${driver.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '11px', color: '#1976d2', textDecoration: 'underline' }}
+                          >
+                          View on Google Maps
+                          </a>
+                        </div>
+                        ) : '—'
                         )}
                       </td>
 

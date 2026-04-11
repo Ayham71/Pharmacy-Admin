@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import MapPicker from '../components/MapPicker'
 
 const BASE_URL = 'http://165.22.91.187:5000/api/Admin/Pharmacy'
 
@@ -612,31 +613,24 @@ const Pharmacies = () => {
                 </select>
               </div>
 
-              {/* Latitude */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Latitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={newPharmacy.latitude}
-                  onChange={(e) => setNewPharmacy({ ...newPharmacy, latitude: e.target.value })}
-                  className="form-input"
-                  placeholder="e.g. 31.9539"
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              {/* Longitude */}
-              <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>Longitude</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={newPharmacy.longitude}
-                  onChange={(e) => setNewPharmacy({ ...newPharmacy, longitude: e.target.value })}
-                  className="form-input"
-                  placeholder="e.g. 35.9106"
-                  style={{ width: '100%' }}
+              {/* Location Map Picker */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontWeight: '500' }}>
+                  Location <span style={{ color: 'red' }}>*</span>
+                  </label>
+                </div>
+                <MapPicker
+                  latitude={newPharmacy.latitude}
+                  longitude={newPharmacy.longitude}
+                  onLocationChange={(lat, lng) => {
+                  setNewPharmacy({
+                  ...newPharmacy,
+                  latitude: lat.toString(),
+                  longitude: lng.toString()
+                })
+                }}
+                height="350px"
                 />
               </div>
 
@@ -812,34 +806,38 @@ const Pharmacies = () => {
 
                       {/* Location */}
                       <td>
-                        {editingId === pharmacy.id ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <input
-                              type="number"
-                              step="any"
-                              value={editForm.latitude || ''}
-                              onChange={(e) => handleInputChange('latitude', e.target.value)}
-                              className="form-input"
-                              placeholder="Latitude"
-                              style={inputStyle}
-                            />
-                            <input
-                              type="number"
-                              step="any"
-                              value={editForm.longitude || ''}
-                              onChange={(e) => handleInputChange('longitude', e.target.value)}
-                              className="form-input"
-                              placeholder="Longitude"
-                              style={inputStyle}
-                            />
-                          </div>
-                        ) : (
-                          pharmacy.latitude && pharmacy.longitude ? (
-                            <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
-                              {parseFloat(pharmacy.latitude).toFixed(4)}, {parseFloat(pharmacy.longitude).toFixed(4)}
-                            </span>
-                          ) : '—'
-                        )}
+                      {editingId === pharmacy.id ? (
+                      <div style={{ minWidth: '350px' }}>
+                        <MapPicker
+                          latitude={editForm.latitude}
+                          longitude={editForm.longitude}
+                          onLocationChange={(lat, lng) => {
+                          setEditForm({
+                          ...editForm,
+                          latitude: lat.toString(),
+                          longitude: lng.toString()
+                          })
+                        }}
+                        height="280px"
+                        />
+                      </div>
+                      ) : (
+                      pharmacy.latitude && pharmacy.longitude ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
+                        📍 {parseFloat(pharmacy.latitude).toFixed(4)}, {parseFloat(pharmacy.longitude).toFixed(4)}
+                      </span>
+                      <a
+                        href={`https://www.google.com/maps?q=${pharmacy.latitude},${pharmacy.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: '11px', color: '#1976d2', textDecoration: 'underline' }}
+                      >
+                      View on Google Maps
+                      </a>
+                      </div>
+                      ) : '—'
+                      )}
                       </td>
 
                       {/* Status */}
