@@ -27,8 +27,30 @@ const Drivers = () => {
     latitude: '',
     longitude: '',
     vehicleType: '',
-    vehicleNumber: ''
+    vehicleNumber: '',
+    image: null,
+    imagePreview: ''
   })
+
+  // ── localStorage helpers for driver images ──────────────────
+  const saveDriverImageLocally = (id, base64Image) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('driverImages') || '{}')
+      existing[id] = base64Image
+      localStorage.setItem('driverImages', JSON.stringify(existing))
+    } catch (e) {
+      console.error('Failed to save driver image locally:', e)
+    }
+  }
+
+  const getDriverImageLocally = (id) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('driverImages') || '{}')
+      return existing[id] || null
+    } catch {
+      return null
+    }
+  }
 
   useEffect(() => {
     fetchDrivers()
@@ -73,20 +95,28 @@ const Drivers = () => {
       console.log('Drivers API response:', data)
 
       const driversList = Array.isArray(data) ? data : [data]
-      const normalized = driversList.map((d) => ({
-        id:            d.id            || d.Id            || d.userId        || d.UserId        || Math.random(),
-        userName:      d.userName      || d.UserName      || d.username      || d.name          || '',
-        email:         d.email         || d.Email         || '',
-        phoneNumber:   d.phoneNumber   || d.PhoneNumber   || d.phone         || '',
-        age:           d.age           || d.Age           || '',
-        latitude:      d.latitude      || d.Latitude      || '',
-        longitude:     d.longitude     || d.Longitude     || '',
-        vehicleType:   d.vehicleType   || d.VehicleType   || '',
-        vehicleNumber: d.vehicleNumber || d.VehicleNumber || '',
-        isActive:
-          d.isActive !== undefined ? d.isActive :
-          d.IsActive !== undefined ? d.IsActive : true,
-      }))
+
+      const normalized = driversList.map((d) => {
+        const id = d.id || d.Id || d.userId || d.UserId || Math.random()
+        const apiImage = d.image || d.Image || d.photo || d.Photo || d.profileImage || d.ProfileImage || null
+        const localImage = getDriverImageLocally(id)
+
+        return {
+          id,
+          userName:      d.userName      || d.UserName      || d.username || d.name || '',
+          email:         d.email         || d.Email         || '',
+          phoneNumber:   d.phoneNumber   || d.PhoneNumber   || d.phone    || '',
+          age:           d.age           || d.Age           || '',
+          latitude:      d.latitude      || d.Latitude      || '',
+          longitude:     d.longitude     || d.Longitude     || '',
+          vehicleType:   d.vehicleType   || d.VehicleType   || '',
+          vehicleNumber: d.vehicleNumber || d.VehicleNumber || '',
+          image:         apiImage || localImage,
+          isActive:
+            d.isActive !== undefined ? d.isActive :
+            d.IsActive !== undefined ? d.IsActive : true,
+        }
+      })
 
       setDrivers(normalized)
     } catch (err) {
@@ -117,6 +147,13 @@ const Drivers = () => {
         return
       }
 
+      // Remove local image too
+      try {
+        const existing = JSON.parse(localStorage.getItem('driverImages') || '{}')
+        delete existing[id]
+        localStorage.setItem('driverImages', JSON.stringify(existing))
+      } catch {}
+
       setDrivers(prev => prev.filter(d => d.id !== id))
       setSuccess('Driver deleted successfully!')
       setTimeout(() => setSuccess(''), 4000)
@@ -129,14 +166,43 @@ const Drivers = () => {
 
   const handleEdit = (driver) => {
     setEditingId(driver.id)
-    setEditForm({ ...driver, password: '' })
+    setEditForm({ ...driver, password: '', imagePreview: driver.image || '' })
     setShowEditPassword(false)
     setError('')
     setSuccess('')
   }
 
+  // Handle image for Add form
+  const handleNewDriverImage = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) {
+      setError('Image size must be less than 3MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setNewDriver(prev => ({ ...prev, image: file, imagePreview: reader.result }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Handle image for Edit form
+  const handleEditDriverImage = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) {
+      setError('Image size must be less than 3MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setEditForm(prev => ({ ...prev, image: file, imagePreview: reader.result }))
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSave = async () => {
-    // Validate age
     const age = parseInt(editForm.age)
     if (!editForm.age || isNaN(age) || age < 18 || age > 70) {
       setError('Age must be between 18 and 70.')
@@ -149,16 +215,18 @@ const Drivers = () => {
 
     try {
       const token = localStorage.getItem('authToken')
+
       const requestData = {
         userName:      editForm.userName?.trim(),
         email:         editForm.email?.trim(),
         phoneNumber:   editForm.phoneNumber?.trim() || '',
         age:           parseInt(editForm.age),
         isActive:      editForm.isActive,
-        latitude:      parseFloat(editForm.latitude) || 0,
+        latitude:      parseFloat(editForm.latitude)  || 0,
         longitude:     parseFloat(editForm.longitude) || 0,
-        vehicleType:   editForm.vehicleType?.trim() || '',
+        vehicleType:   editForm.vehicleType?.trim()   || '',
         vehicleNumber: editForm.vehicleNumber?.trim() || '',
+        image:         editForm.imagePreview || editForm.image || null,
       }
       if (editForm.password?.trim()) requestData.password = editForm.password
 
@@ -182,6 +250,9 @@ const Drivers = () => {
         return
       }
 
+      const updatedImage = editForm.imagePreview || editForm.image || null
+      saveDriverImageLocally(editingId, updatedImage)
+
       setDrivers(prev => prev.map(d =>
         d.id === editingId ? {
           ...d,
@@ -194,6 +265,7 @@ const Drivers = () => {
           longitude:     editForm.longitude,
           vehicleType:   editForm.vehicleType,
           vehicleNumber: editForm.vehicleNumber,
+          image:         updatedImage,
         } : d
       ))
       setEditingId(null)
@@ -219,7 +291,6 @@ const Drivers = () => {
   }
 
   const handleAddDriver = async () => {
-    // Validate required fields
     if (!newDriver.userName?.trim())      { setError('Driver name is required.');    return }
     if (!newDriver.email?.trim())         { setError('Email is required.');           return }
     if (!newDriver.password?.trim())      { setError('Password is required.');        return }
@@ -229,7 +300,6 @@ const Drivers = () => {
     if (!newDriver.vehicleType?.trim())   { setError('Vehicle type is required.');   return }
     if (!newDriver.vehicleNumber?.trim()) { setError('Vehicle number is required.'); return }
 
-    // Validate age range
     const age = parseInt(newDriver.age)
     if (isNaN(age) || age < 18 || age > 70) {
       setError('Age must be between 18 and 70.')
@@ -248,6 +318,7 @@ const Drivers = () => {
 
     try {
       const token = localStorage.getItem('authToken')
+
       const requestData = {
         userName:      newDriver.userName.trim(),
         email:         newDriver.email.trim(),
@@ -259,9 +330,8 @@ const Drivers = () => {
         longitude:     parseFloat(newDriver.longitude),
         vehicleType:   newDriver.vehicleType.trim(),
         vehicleNumber: newDriver.vehicleNumber.trim(),
+        image:         newDriver.imagePreview || null,
       }
-
-      console.log('POST Body:', { ...requestData, password: '[HIDDEN]' })
 
       const response = await fetch(BASE_URL, {
         method: 'POST',
@@ -273,9 +343,6 @@ const Drivers = () => {
       })
 
       const responseText = await response.text()
-      console.log('Response status:', response.status)
-      console.log('Response body:', responseText)
-
       let responseData = {}
       try { if (responseText) responseData = JSON.parse(responseText) } catch {}
 
@@ -288,6 +355,11 @@ const Drivers = () => {
       }
 
       const newId = responseData.id || responseData.userId || Date.now()
+
+      if (newDriver.imagePreview) {
+        saveDriverImageLocally(newId, newDriver.imagePreview)
+      }
+
       setDrivers(prev => [...prev, {
         id:            newId,
         userName:      newDriver.userName,
@@ -299,12 +371,13 @@ const Drivers = () => {
         longitude:     newDriver.longitude,
         vehicleType:   newDriver.vehicleType,
         vehicleNumber: newDriver.vehicleNumber,
+        image:         newDriver.imagePreview || null,
       }])
 
       setNewDriver({
         userName: '', email: '', phoneNumber: '', age: '',
         password: '', isActive: true, latitude: '', longitude: '',
-        vehicleType: '', vehicleNumber: ''
+        vehicleType: '', vehicleNumber: '', image: null, imagePreview: ''
       })
       setShowAddForm(false)
       setShowAddPassword(false)
@@ -321,7 +394,7 @@ const Drivers = () => {
     setNewDriver({
       userName: '', email: '', phoneNumber: '', age: '',
       password: '', isActive: true, latitude: '', longitude: '',
-      vehicleType: '', vehicleNumber: ''
+      vehicleType: '', vehicleNumber: '', image: null, imagePreview: ''
     })
     setShowAddForm(false)
     setShowAddPassword(false)
@@ -339,6 +412,39 @@ const Drivers = () => {
     border: '1px solid var(--gray-300)',
     borderRadius: '4px'
   }
+
+  // Reusable image upload box
+  const ImageUploadBox = ({ preview, onChange, size = 80 }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+      {preview ? (
+        <img
+          src={preview}
+          alt="Driver"
+          style={{ width: size, height: size, objectFit: 'cover', borderRadius: '50%', border: '3px solid var(--primary-gold)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+        />
+      ) : (
+        <div style={{ width: size, height: size, borderRadius: '50%', border: '2px dashed var(--gray-300)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa', gap: '4px' }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="1.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span style={{ fontSize: '9px', color: '#aaa' }}>No photo</span>
+        </div>
+      )}
+      <label style={{ cursor: 'pointer' }}>
+        <span style={{ fontSize: '11px', color: 'var(--primary-gold)', textDecoration: 'underline', fontWeight: '500' }}>
+          {preview ? '📷 Change' : '📷 Upload'}
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={onChange}
+          style={{ display: 'none' }}
+        />
+      </label>
+      <small style={{ fontSize: '10px', color: '#999' }}>Max 3MB</small>
+    </div>
+  )
 
   return (
     <div className="page-content">
@@ -371,6 +477,21 @@ const Drivers = () => {
         {showAddForm && (
           <div style={{ backgroundColor: 'var(--white)', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid var(--gray-200)' }}>
             <h4 style={{ marginBottom: '16px', color: 'var(--gray-900)' }}>Add New Driver</h4>
+
+            {/* Image upload centered at top */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '13px', fontWeight: '500', marginBottom: '8px', color: 'var(--gray-700)' }}>
+                  Driver Photo
+                </p>
+                <ImageUploadBox
+                  preview={newDriver.imagePreview}
+                  onChange={handleNewDriverImage}
+                  size={90}
+                />
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
 
               {/* Driver Name */}
@@ -556,6 +677,7 @@ const Drivers = () => {
               </div>
 
             </div>
+
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
               <button className="btn btn-primary" onClick={handleAddDriver} disabled={addLoading}>
                 {addLoading ? (
@@ -592,7 +714,7 @@ const Drivers = () => {
             Loading drivers...
           </div>
         ) : error && drivers.length === 0 ? (
-          <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px' }}>
+          <div className="error-message">
             ⚠️ {error}
             <button onClick={fetchDrivers} style={{ marginLeft: '12px', padding: '4px 12px', border: '1px solid #c62828', borderRadius: '4px', background: 'transparent', color: '#c62828', cursor: 'pointer', fontSize: '12px' }}>
               Retry
@@ -603,6 +725,7 @@ const Drivers = () => {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>Photo</th>
                   <th>Driver</th>
                   <th>Email</th>
                   <th>Phone</th>
@@ -617,7 +740,7 @@ const Drivers = () => {
               <tbody>
                 {filteredDrivers.length === 0 ? (
                   <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
+                    <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
                       {searchTerm ? 'No drivers match your search.' : 'No drivers found.'}
                     </td>
                   </tr>
@@ -625,46 +748,70 @@ const Drivers = () => {
                   filteredDrivers.map((driver) => (
                     <tr key={driver.id}>
 
+                      {/* Photo Column */}
+                      <td style={{ textAlign: 'center' }}>
+                        {editingId === driver.id ? (
+                          <ImageUploadBox
+                            preview={editForm.imagePreview || ''}
+                            onChange={handleEditDriverImage}
+                            size={60}
+                          />
+                        ) : (
+                          driver.image ? (
+                            <img
+                              src={driver.image}
+                              alt={driver.userName}
+                              style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--primary-gold)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
+                            />
+                          ) : (
+                            <img
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(driver.userName || 'D')}&background=FFD700&color=fff&size=128`}
+                              alt={driver.userName}
+                              style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--primary-gold)', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}
+                            />
+                          )
+                        )}
+                      </td>
+
                       {/* Driver Name */}
                       <td>
                         {editingId === driver.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(editForm.userName || driver.userName)}&background=FFD700&color=fff`}
-                              alt=""
-                              className="driver-avatar"
-                            />
-                            <input
-                              type="text"
-                              value={editForm.userName || ''}
-                              onChange={(e) => handleInputChange('userName', e.target.value)}
-                              className="form-input"
-                              style={inputStyle}
-                            />
-                          </div>
+                          <input
+                            type="text"
+                            value={editForm.userName || ''}
+                            onChange={(e) => handleInputChange('userName', e.target.value)}
+                            className="form-input"
+                            style={inputStyle}
+                          />
                         ) : (
-                          <div className="driver-info">
-                            <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(driver.userName || 'D')}&background=FFD700&color=fff`}
-                              alt={driver.userName}
-                              className="driver-avatar"
-                            />
-                            <span className="order-id">{driver.userName}</span>
-                          </div>
+                          <span className="order-id">{driver.userName}</span>
                         )}
                       </td>
 
                       {/* Email */}
                       <td>
                         {editingId === driver.id ? (
-                          <input type="email" value={editForm.email || ''} onChange={(e) => handleInputChange('email', e.target.value)} className="form-input" style={inputStyle} />
+                          <input
+                            type="email"
+                            value={editForm.email || ''}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                            className="form-input"
+                            style={inputStyle}
+                          />
                         ) : driver.email || '—'}
                       </td>
 
                       {/* Phone */}
                       <td>
                         {editingId === driver.id ? (
-                          <input type="tel" value={editForm.phoneNumber || ''} onChange={(e) => handleInputChange('phoneNumber', e.target.value.replace(/\D/g, ''))} className="form-input" placeholder="Numbers only" style={inputStyle} />
+                          <input
+                            type="tel"
+                            value={editForm.phoneNumber || ''}
+                            onChange={(e) => handleInputChange('phoneNumber', e.target.value.replace(/\D/g, ''))}
+                            className="form-input"
+                            placeholder="Numbers only"
+                            style={inputStyle}
+                          />
                         ) : driver.phoneNumber || '—'}
                       </td>
 
@@ -696,7 +843,11 @@ const Drivers = () => {
                       {/* Vehicle Type */}
                       <td>
                         {editingId === driver.id ? (
-                          <select value={editForm.vehicleType || ''} onChange={(e) => handleInputChange('vehicleType', e.target.value)} style={inputStyle}>
+                          <select
+                            value={editForm.vehicleType || ''}
+                            onChange={(e) => handleInputChange('vehicleType', e.target.value)}
+                            style={inputStyle}
+                          >
                             <option value="">Select type</option>
                             <option value="car">Car</option>
                             <option value="motorcycle">Motorcycle</option>
@@ -711,7 +862,14 @@ const Drivers = () => {
                       {/* Vehicle Number */}
                       <td>
                         {editingId === driver.id ? (
-                          <input type="text" value={editForm.vehicleNumber || ''} onChange={(e) => handleInputChange('vehicleNumber', e.target.value)} className="form-input" placeholder="e.g. ABC-1234" style={inputStyle} />
+                          <input
+                            type="text"
+                            value={editForm.vehicleNumber || ''}
+                            onChange={(e) => handleInputChange('vehicleNumber', e.target.value)}
+                            className="form-input"
+                            placeholder="e.g. ABC-1234"
+                            style={inputStyle}
+                          />
                         ) : driver.vehicleNumber || '—'}
                       </td>
 
@@ -719,8 +877,24 @@ const Drivers = () => {
                       <td>
                         {editingId === driver.id ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <input type="number" step="any" value={editForm.latitude || ''} onChange={(e) => handleInputChange('latitude', e.target.value)} className="form-input" placeholder="Latitude" style={inputStyle} />
-                            <input type="number" step="any" value={editForm.longitude || ''} onChange={(e) => handleInputChange('longitude', e.target.value)} className="form-input" placeholder="Longitude" style={inputStyle} />
+                            <input
+                              type="number"
+                              step="any"
+                              value={editForm.latitude || ''}
+                              onChange={(e) => handleInputChange('latitude', e.target.value)}
+                              className="form-input"
+                              placeholder="Latitude"
+                              style={inputStyle}
+                            />
+                            <input
+                              type="number"
+                              step="any"
+                              value={editForm.longitude || ''}
+                              onChange={(e) => handleInputChange('longitude', e.target.value)}
+                              className="form-input"
+                              placeholder="Longitude"
+                              style={inputStyle}
+                            />
                           </div>
                         ) : (
                           driver.latitude && driver.longitude ? (
@@ -734,7 +908,11 @@ const Drivers = () => {
                       {/* Status */}
                       <td>
                         {editingId === driver.id ? (
-                          <select value={editForm.isActive ? 'active' : 'inactive'} onChange={(e) => handleInputChange('isActive', e.target.value === 'active')} style={inputStyle}>
+                          <select
+                            value={editForm.isActive ? 'active' : 'inactive'}
+                            onChange={(e) => handleInputChange('isActive', e.target.value === 'active')}
+                            style={inputStyle}
+                          >
                             <option value="active">Active</option>
                             <option value="inactive">Inactive</option>
                           </select>
@@ -767,7 +945,12 @@ const Drivers = () => {
                               />
                             )}
                             <div style={{ display: 'flex', gap: '8px' }}>
-                              <button className="action-btn" title="Save" onClick={handleSave} disabled={editLoading}>
+                              <button
+                                className="action-btn"
+                                title="Save"
+                                onClick={handleSave}
+                                disabled={editLoading}
+                              >
                                 {editLoading ? (
                                   <span style={{ width: '14px', height: '14px', border: '2px solid #ccc', borderTop: '2px solid #333', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                                 ) : (
@@ -778,7 +961,12 @@ const Drivers = () => {
                                   </svg>
                                 )}
                               </button>
-                              <button className="action-btn delete-btn" title="Cancel" onClick={handleCancel} disabled={editLoading}>
+                              <button
+                                className="action-btn delete-btn"
+                                title="Cancel"
+                                onClick={handleCancel}
+                                disabled={editLoading}
+                              >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <line x1="18" y1="6" x2="6" y2="18"/>
                                   <line x1="6" y1="6" x2="18" y2="18"/>
@@ -788,7 +976,11 @@ const Drivers = () => {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="action-btn" title="Edit" onClick={() => handleEdit(driver)}>
+                            <button
+                              className="action-btn"
+                              title="Edit"
+                              onClick={() => handleEdit(driver)}
+                            >
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
