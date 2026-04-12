@@ -644,7 +644,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                                   </button>
                                   <button
                                     onClick={() => deleteMedicine(category.id, medicine.name)}
-                                    style={{ padding: '4px 12px', backgroundColor: '#f44336', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                    style={{ padding: '4px 12px', backgroundColor: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                                   >
                                     Delete
                                   </button>
