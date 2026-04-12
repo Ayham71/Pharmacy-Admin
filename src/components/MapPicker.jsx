@@ -117,7 +117,7 @@ const MapPicker = ({ latitude, longitude, onLocationChange, height = '400px' }) 
         <div>
           <strong>📍 Selected Location:</strong>
         </div>
-        <div style={{ fontFamily: 'monospace', color: '#1976d2' }}>
+        <div style={{ fontFamily: 'monospace', color: 'var(--info)' }}>
           {markerPosition.lat.toFixed(6)}, {markerPosition.lng.toFixed(6)}
         </div>
       </div>

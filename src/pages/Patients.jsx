@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import MapPicker from '../components/MapPicker'
 
 const Patients = () => {
   const [patients, setPatients] = useState([])
@@ -20,7 +21,9 @@ const Patients = () => {
     email: '',
     phoneNumber: '',
     address: '',
-    password: ''
+    password: '',
+    latitude: '',
+    longitude: ''
   })
 
   useEffect(() => {
@@ -69,7 +72,9 @@ const Patients = () => {
         userName: p.userName || p.UserName || p.name || p.Name || '',
         email: p.email || p.Email || '',
         phoneNumber: p.phoneNumber || p.PhoneNumber || p.phone || p.Phone || '',
-        address: p.address || p.Address || ''
+        address: p.address || p.Address || '',
+        latitude: p.latitude || p.Latitude || '',
+        longitude: p.longitude || p.Longitude || ''
       }))
 
       setPatients(normalized)
@@ -122,6 +127,8 @@ const Patients = () => {
       email: patient.email,
       phoneNumber: patient.phoneNumber,
       address: patient.address,
+      latitude: patient.latitude,
+      longitude: patient.longitude,
       password: ''
     })
     setShowEditPassword(false)
@@ -141,7 +148,9 @@ const Patients = () => {
         userName: editForm.userName?.trim(),
         email: editForm.email?.trim(),
         phoneNumber: editForm.phoneNumber?.trim() || '',
-        address: editForm.address?.trim() || ''
+        address: editForm.address?.trim() || '',
+        latitude: editForm.latitude ? parseFloat(editForm.latitude) : 0,
+        longitude: editForm.longitude ? parseFloat(editForm.longitude) : 0
       }
 
       // Only include password if user entered one
@@ -181,7 +190,9 @@ const Patients = () => {
               userName: editForm.userName,
               email: editForm.email,
               phoneNumber: editForm.phoneNumber,
-              address: editForm.address
+              address: editForm.address,
+              latitude: editForm.latitude,
+              longitude: editForm.longitude
             }
           : patient
       ))
@@ -230,7 +241,9 @@ const Patients = () => {
         email: newPatient.email.trim(),
         password: newPatient.password,
         phoneNumber: newPatient.phoneNumber?.trim() || '',
-        address: newPatient.address?.trim() || ''
+        address: newPatient.address?.trim() || '',
+        latitude: newPatient.latitude ? parseFloat(newPatient.latitude) : 0,
+        longitude: newPatient.longitude ? parseFloat(newPatient.longitude) : 0
       }
 
       const response = await fetch('http://165.22.91.187:5000/api/Admin/Patient', {
@@ -264,10 +277,20 @@ const Patients = () => {
         userName: newPatient.userName,
         email: newPatient.email,
         phoneNumber: newPatient.phoneNumber,
-        address: newPatient.address
+        address: newPatient.address,
+        latitude: newPatient.latitude,
+        longitude: newPatient.longitude
       }])
 
-      setNewPatient({ userName: '', email: '', phoneNumber: '', address: '', password: '' })
+      setNewPatient({ 
+        userName: '', 
+        email: '', 
+        phoneNumber: '', 
+        address: '', 
+        password: '',
+        latitude: '',
+        longitude: ''
+      })
       setShowAddForm(false)
       setShowAddPassword(false)
       setSuccess('Patient added successfully!')
@@ -280,7 +303,15 @@ const Patients = () => {
   }
 
   const handleCancelAdd = () => {
-    setNewPatient({ userName: '', email: '', phoneNumber: '', address: '', password: '' })
+    setNewPatient({ 
+      userName: '', 
+      email: '', 
+      phoneNumber: '', 
+      address: '', 
+      password: '',
+      latitude: '',
+      longitude: ''
+    })
     setShowAddForm(false)
     setShowAddPassword(false)
     setError('')
@@ -419,6 +450,25 @@ const Patients = () => {
                 />
               </div>
 
+              {/* Location Map Picker */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
+                  Patient Location
+                </label>
+                <MapPicker
+                  latitude={newPatient.latitude}
+                  longitude={newPatient.longitude}
+                  onLocationChange={(lat, lng) => {
+                    setNewPatient({
+                      ...newPatient,
+                      latitude: lat.toString(),
+                      longitude: lng.toString()
+                    })
+                  }}
+                  height="350px"
+                />
+              </div>
+
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
               <button className="btn btn-primary" onClick={handleAddPatient} disabled={addLoading}>
@@ -470,13 +520,14 @@ const Patients = () => {
                   <th>Email</th>
                   <th>Phone</th>
                   <th>Address</th>
+                  <th>Location</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPatients.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
                       {searchTerm ? 'No patients match your search.' : 'No patients found.'}
                     </td>
                   </tr>
@@ -560,6 +611,42 @@ const Patients = () => {
                         )}
                       </td>
 
+                      {/* Location */}
+                      <td>
+                        {editingId === patient.id ? (
+                          <div style={{ minWidth: '350px' }}>
+                            <MapPicker
+                              latitude={editForm.latitude}
+                              longitude={editForm.longitude}
+                              onLocationChange={(lat, lng) => {
+                                setEditForm({
+                                  ...editForm,
+                                  latitude: lat.toString(),
+                                  longitude: lng.toString()
+                                })
+                              }}
+                              height="280px"
+                            />
+                          </div>
+                        ) : (
+                          patient.latitude && patient.longitude ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
+                                📍 <a
+                                href={`https://www.google.com/maps?q=${patient.latitude},${patient.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: '11px', color: '#1976d2', textDecoration: 'underline' }}
+                              >
+                                View on Google Maps
+                              </a>
+                              {/*{parseFloat(patient.latitude).toFixed(4)}, {parseFloat(patient.longitude).toFixed(4)}*/}
+                              </span>
+                            </div>
+                          ) : '—'
+                        )}
+                      </td>
+
                       {/* Actions */}
                       <td>
                         {editingId === patient.id ? (
@@ -575,10 +662,10 @@ const Patients = () => {
                               style={{
                                 padding: '5px 10px',
                                 fontSize: '12px',
-                                border: `1px solid ${showEditPassword ? 'var(--danger)' : 'var(--warning)'}`,
+                                border: `1px solid ${showEditPassword ? '#f44336' : '#2196f3'}`,
                                 borderRadius: '6px',
                                 background: 'transparent',
-                                color: showEditPassword ? 'var(--danger)' : 'var(--gold-dark)',
+                                color: showEditPassword ? '#f44336' : '#2196f3',
                                 cursor: 'pointer',
                                 whiteSpace: 'nowrap'
                               }}
@@ -590,12 +677,12 @@ const Patients = () => {
                             {showEditPassword && (
                               <div style={{ position: 'relative' }}>
                                 <input
-                                  type={showEditPassword ? 'text' : 'password'}
+                                  type="text"
                                   value={editForm.password || ''}
                                   onChange={(e) => handleInputChange('password', e.target.value)}
                                   className="form-input"
                                   placeholder="Enter new password"
-                                  style={{ width: '100%', padding: '6px 36px 6px 8px', border: '1px solid var(--gray-300)', borderRadius: '4px', fontSize: '13px' }}
+                                  style={{ width: '100%', padding: '6px 8px', border: '1px solid var(--gray-300)', borderRadius: '4px', fontSize: '13px' }}
                                 />
                               </div>
                             )}

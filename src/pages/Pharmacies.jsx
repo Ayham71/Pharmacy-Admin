@@ -825,9 +825,7 @@ const Pharmacies = () => {
                       pharmacy.latitude && pharmacy.longitude ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
-                        📍 {parseFloat(pharmacy.latitude).toFixed(4)}, {parseFloat(pharmacy.longitude).toFixed(4)}
-                      </span>
-                      <a
+                        📍 <a
                         href={`https://www.google.com/maps?q=${pharmacy.latitude},${pharmacy.longitude}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -835,6 +833,9 @@ const Pharmacies = () => {
                       >
                       View on Google Maps
                       </a>
+                       {/*{parseFloat(pharmacy.latitude).toFixed(4)}, {parseFloat(pharmacy.longitude).toFixed(4)}*/}
+                      </span>
+                      
                       </div>
                       ) : '—'
                       )}

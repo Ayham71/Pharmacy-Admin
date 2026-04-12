@@ -876,9 +876,7 @@ const Drivers = () => {
                         driver.latitude && driver.longitude ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span style={{ fontSize: '12px', color: 'var(--medium-gray)' }}>
-                            📍 {parseFloat(driver.latitude).toFixed(4)}, {parseFloat(driver.longitude).toFixed(4)}
-                          </span>
-                          <a
+                            📍 <a
                           href={`https://www.google.com/maps?q=${driver.latitude},${driver.longitude}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -886,6 +884,9 @@ const Drivers = () => {
                           >
                           View on Google Maps
                           </a>
+                          {/* {parseFloat(driver.latitude).toFixed(4)}, {parseFloat(driver.longitude).toFixed(4)} */}
+                          </span>
+                          
                         </div>
                         ) : '—'
                         )}
