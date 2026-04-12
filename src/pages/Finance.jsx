@@ -12,10 +12,10 @@ const Finance = () => {
   ]
 
   const stats = [
-    { label: 'Total Revenue', value: '$124,500', change: '+12.5%', icon: '💰' },
-    { label: 'Total Expenses', value: '$45,200', change: '+5.2%', icon: '💸' },
-    { label: 'Net Profit', value: '$79,300', change: '+18.3%', icon: '📈' },
-    { label: 'Pending Payments', value: '$12,400', change: '+2.1%', icon: '⏳' },
+    { label: 'Total Revenue', value: '$124,500', icon: '💰' },
+    { label: 'Total Expenses', value: '$45,200', icon: '💸' },
+    { label: 'Net Profit', value: '$79,300', icon: '📈' },
+    { label: 'Pending Payments', value: '$12,400', icon: '⏳' },
   ]
 
   return (
@@ -42,7 +42,7 @@ const Finance = () => {
       <div className="section">
         <div className="section-header">
           <h3 className="section-title">Recent Transactions</h3>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          {/*<div style={{ display: 'flex', gap: '10px' }}>
             <select 
               className="filter-btn"
               value={period}
@@ -54,8 +54,7 @@ const Finance = () => {
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
             </select>
-            <button className="btn btn-primary">Export Report</button>
-          </div>
+          </div>*/}
         </div>
 
         <div className="table-container">
@@ -77,7 +76,7 @@ const Finance = () => {
                   <td>
                     <span style={{ 
                       textTransform: 'capitalize',
-                      color: transaction.type === 'income' ? '#28A745' : '#DC3545',
+                      color: transaction.type === 'income' ? 'var(--success)' : 'var(--danger)',
                       fontWeight: '500'
                     }}>
                       {transaction.type}
@@ -85,7 +84,7 @@ const Finance = () => {
                   </td>
                   <td>{transaction.description}</td>
                   <td className="value-cell" style={{ 
-                    color: transaction.type === 'income' ? '#28A745' : '#DC3545'
+                    color: transaction.type === 'income' ? 'var(--success)' : 'var(--danger)'
                   }}>
                     {transaction.amount}
                   </td>
