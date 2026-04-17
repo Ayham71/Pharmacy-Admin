@@ -399,7 +399,7 @@ const Admins = () => {
                         ) : (
                           <div className="driver-info">
                             <img
-                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(admin.username || 'A')}&background=FFC107&color=fff`}
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(admin.username || 'A')}&background=FFD700&color=fff`}
                               alt={admin.username}
                               className="driver-avatar"
                             />
