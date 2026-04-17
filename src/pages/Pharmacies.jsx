@@ -18,7 +18,6 @@ const Pharmacies = () => {
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showEditPassword, setShowEditPassword] = useState(false)
   
-  // Local storage for images (session-based)
   const [pharmacyImages, setPharmacyImages] = useState(() => {
     try {
       const stored = localStorage.getItem('pharmacyImages')
@@ -65,7 +64,6 @@ const Pharmacies = () => {
     fetchPharmacies()
   }, [])
 
-  // Save images to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('pharmacyImages', JSON.stringify(pharmacyImages))
   }, [pharmacyImages])
@@ -120,7 +118,7 @@ const Pharmacies = () => {
           address: p.address || p.Address || p.location || p.Location || '',
           latitude: p.latitude || p.Latitude || '',
           longitude: p.longitude || p.Longitude || '',
-          image: pharmacyImages[id] || null, // Use locally stored image
+          image: pharmacyImages[id] || null,
           isActive: p.isActive !== undefined ? p.isActive : p.IsActive !== undefined ? p.IsActive : true,
         }
       })
@@ -159,7 +157,6 @@ const Pharmacies = () => {
         return
       }
 
-      // Remove local image
       setPharmacyImages(prev => {
         const updated = { ...prev }
         delete updated[id]
@@ -269,7 +266,6 @@ const Pharmacies = () => {
         return
       }
 
-      // Save image locally if updated
       if (editForm.imagePreview) {
         setPharmacyImages(prev => ({
           ...prev,
@@ -380,7 +376,6 @@ const Pharmacies = () => {
         return
       }
 
-      // Save image locally with the new ID
       const newId = responseData.id || responseData.userId || Date.now()
       if (newPharmacy.imagePreview) {
         setPharmacyImages(prev => ({
@@ -502,18 +497,30 @@ const Pharmacies = () => {
   return (
     <div className="page-content">
       <div className="section">
+
+        {/* ── Header with Refresh + Add Pharmacy ── */}
         <div className="section-header">
           <h3 className="section-title">All Pharmacies</h3>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setShowAddForm(!showAddForm)
-              setError('')
-              setSuccess('')
-            }}
-          >
-            {showAddForm ? 'Cancel' : '+ Add Pharmacy'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchPharmacies}
+              disabled={loading || addLoading || editLoading}
+              style={{ padding: '8px 16px', fontSize: '14px' }}
+            >
+              🔄 Refresh
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setShowAddForm(!showAddForm)
+                setError('')
+                setSuccess('')
+              }}
+            >
+              {showAddForm ? 'Cancel' : '+ Add Pharmacy'}
+            </button>
+          </div>
         </div>
 
         {error && (

@@ -18,7 +18,6 @@ const Drivers = () => {
   const [showAddPassword, setShowAddPassword] = useState(false)
   const [showEditPassword, setShowEditPassword] = useState(false)
   
-  // Local storage for images (session-based)
   const [driverImages, setDriverImages] = useState(() => {
     try {
       const stored = localStorage.getItem('driverImages')
@@ -66,7 +65,6 @@ const Drivers = () => {
     fetchDrivers()
   }, [])
 
-  // Save images to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('driverImages', JSON.stringify(driverImages))
   }, [driverImages])
@@ -122,7 +120,7 @@ const Drivers = () => {
           longitude: d.longitude || d.Longitude || '',
           vehicleType: d.vehicleType || d.VehicleType || '',
           vehicleNumber: d.vehicleNumber || d.VehicleNumber || '',
-          image: driverImages[id] || null, // Use locally stored image
+          image: driverImages[id] || null,
           isActive: d.isActive !== undefined ? d.isActive : d.IsActive !== undefined ? d.IsActive : true,
         }
       })
@@ -161,7 +159,6 @@ const Drivers = () => {
         return
       }
 
-      // Remove local image
       setDriverImages(prev => {
         const updated = { ...prev }
         delete updated[id]
@@ -278,7 +275,6 @@ const Drivers = () => {
         return
       }
 
-      // Save image locally if updated
       if (editForm.imagePreview) {
         setDriverImages(prev => ({
           ...prev,
@@ -378,7 +374,6 @@ const Drivers = () => {
         return
       }
 
-      // Save image locally with the new ID
       const newId = responseData.id || responseData.userId || Date.now()
       if (newDriver.imagePreview) {
         setDriverImages(prev => ({
@@ -500,18 +495,30 @@ const Drivers = () => {
   return (
     <div className="page-content">
       <div className="section">
+
+        {/* ── Header with Refresh + Add Driver ── */}
         <div className="section-header">
           <h3 className="section-title">All Drivers</h3>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setShowAddForm(!showAddForm)
-              setError('')
-              setSuccess('')
-            }}
-          >
-            {showAddForm ? 'Cancel' : '+ Add Driver'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={fetchDrivers}
+              disabled={loading || addLoading || editLoading}
+              style={{ padding: '8px 16px', fontSize: '14px' }}
+            >
+              🔄 Refresh
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setShowAddForm(!showAddForm)
+                setError('')
+                setSuccess('')
+              }}
+            >
+              {showAddForm ? 'Cancel' : '+ Add Driver'}
+            </button>
+          </div>
         </div>
 
         {error && (
