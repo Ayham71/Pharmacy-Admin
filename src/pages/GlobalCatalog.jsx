@@ -1,26 +1,22 @@
 import React, { useState, useEffect } from 'react'
 
 const API_BASE_URL = 'http://165.22.91.187:5000/api/Admin'
-const BASE_URL = 'http://165.22.91.187:5000' // Base URL for serving images (adjust if needed)
+const BASE_URL = 'http://165.22.91.187:5000'
 
 const GlobalCatalog = ({ categories, setCategories }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedCategories, setExpandedCategories] = useState({})
   const [addingToCategory, setAddingToCategory] = useState(null)
-  const [newMedicine, setNewMedicine] = useState({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' })
+  const [newMedicine, setNewMedicine] = useState({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false })
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryData, setNewCategoryData] = useState({ name: '', icon: '💊' })
   const [editingMedicine, setEditingMedicine] = useState(null)
-  const [editMedicineForm, setEditMedicineForm] = useState({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' })
+  const [editMedicineForm, setEditMedicineForm] = useState({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Helper function to get auth token
-  const getAuthToken = () => {
-    return localStorage.getItem('authToken')
-  }
+  const getAuthToken = () => localStorage.getItem('authToken')
 
-  // Headers for JSON requests (Categories)
   const getJsonHeaders = () => {
     const token = getAuthToken()
     return {
@@ -30,31 +26,26 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
   }
 
-  // Headers for FormData requests (Medicines)
   const getFormDataHeaders = () => {
     const token = getAuthToken()
     return {
       'Accept': 'application/json',
       'Authorization': token ? `Bearer ${token}` : ''
-      // DO NOT SET Content-Type! Browser sets it with boundary.
     }
   }
 
-  // Check if user is logged in as admin
   const isLoggedIn = () => {
     const token = getAuthToken()
     const role = localStorage.getItem('userRole')
     return !!(token && role === 'Admin')
   }
 
-  // Fetch categories on mount
   useEffect(() => {
     if (isLoggedIn()) {
       fetchCategories()
     }
   }, [])
 
-  // Fetch all categories with medicines
   const fetchCategories = async () => {
     if (!isLoggedIn()) {
       setError('Please login to access the catalog')
@@ -63,7 +54,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
     setLoading(true)
     setError(null)
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/Category/with-medicines`, {
         method: 'GET',
@@ -81,12 +72,10 @@ const GlobalCatalog = ({ categories, setCategories }) => {
       }
 
       const data = await response.json()
-      
       console.log('📦 RAW API RESPONSE:', JSON.stringify(data, null, 2))
 
       const transformedData = data.map(cat => {
         const medicationsArray = cat.medications || cat.centralMedicines || cat.medicines || []
-        
         console.log(`📂 Category: ${cat.categoryName || cat.name} (ID: ${cat.id})`)
 
         return {
@@ -94,19 +83,17 @@ const GlobalCatalog = ({ categories, setCategories }) => {
           name: cat.categoryName || cat.name,
           icon: cat.icon || '💊',
           medicines: medicationsArray.map(med => {
-            // 🔍 Log the entire medicine object to see ALL fields
             console.log(`🔍 FULL Medicine Object for "${med.medicationName || med.name}":`, med)
-            
-            // Check ALL possible image field variations (case-insensitive)
+
             let imagePath = null
             const imageFields = [
-              'image', 'imageUrl', 'imagePath', 'imageURL', 
+              'image', 'imageUrl', 'imagePath', 'imageURL',
               'Image', 'ImageUrl', 'ImagePath', 'ImageURL',
               'url', 'URL', 'filePath', 'FilePath', 'path', 'Path',
               'photo', 'Photo', 'picture', 'Picture',
               'fileName', 'FileName', 'file', 'File'
             ]
-            
+
             for (const field of imageFields) {
               if (med[field]) {
                 imagePath = med[field]
@@ -115,56 +102,47 @@ const GlobalCatalog = ({ categories, setCategories }) => {
               }
             }
 
-            // If no image field found, log all available fields
             if (!imagePath) {
               console.warn(`⚠️ NO IMAGE FIELD FOUND! Available fields:`, Object.keys(med))
             }
 
-            // Construct full URL if path exists
             if (imagePath) {
-              // Remove any leading/trailing whitespace
               imagePath = imagePath.trim()
-              
-              // If it's already a full URL or base64, use as-is
-              if (imagePath.startsWith('http://') || 
-                  imagePath.startsWith('https://') || 
-                  imagePath.startsWith('data:')) {
+              if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('data:')) {
                 console.log(`📌 Using absolute path: ${imagePath}`)
               } else {
-                // It's a relative path - construct full URL
-                // Remove leading slash if present, we'll add it
                 const cleanPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath
-                
-                // Try multiple URL construction methods
-                const possibleUrls = [
-                  `${BASE_URL}/${cleanPath}`,                    // http://server/path/image.jpg
-                  `${BASE_URL}/uploads/${cleanPath}`,             // http://server/uploads/image.jpg
-                  `${BASE_URL}/images/${cleanPath}`,              // http://server/images/image.jpg
-                  `${BASE_URL}/api/images/${cleanPath}`,          // http://server/api/images/image.jpg
-                ]
-                
-                imagePath = possibleUrls[0] // Use first one by default
+                imagePath = `${BASE_URL}/${cleanPath}`
                 console.log(`🔗 Constructed URL: ${imagePath}`)
-                console.log(`🔗 Alternative URLs to try:`, possibleUrls)
               }
             }
 
-            console.log(`🖼️ Final Image Path: ${imagePath || 'NULL'}`)
+            // Extract requiresPrescription from all possible field names
+            const requiresPrescription =
+              med.requiresPrescription ??
+              med.RequiresPrescription ??
+              med.requires_prescription ??
+              med.isPrescription ??
+              med.IsPrescription ??
+              false
+
+            console.log(`💊 RequiresPrescription for "${med.medicationName || med.name}": ${requiresPrescription}`)
 
             return {
               id: med.id,
               name: med.medicationName || med.name || med.medicineName,
               activeIngredient: med.activeIngredient || '',
               price: `$${parseFloat(med.price || 0).toFixed(2)}`,
-              image: imagePath
+              image: imagePath,
+              requiresPrescription: Boolean(requiresPrescription)
             }
           })
         }
       })
-      
+
       setCategories(transformedData)
       localStorage.setItem('catalogCategories', JSON.stringify(transformedData))
-      
+
     } catch (err) {
       console.error('❌ Error fetching categories:', err)
       setError(err.message)
@@ -187,18 +165,16 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
   const addMedicine = (categoryId) => {
     setAddingToCategory(categoryId)
-    setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' })
+    setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false })
   }
 
   const handleNewMedicineImage = (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     if (file.size > 2 * 1024 * 1024) {
       alert('Image size must be less than 2MB')
       return
     }
-
     const reader = new FileReader()
     reader.onloadend = () => {
       setNewMedicine(prev => ({ ...prev, image: file, imagePreview: reader.result }))
@@ -209,12 +185,10 @@ const GlobalCatalog = ({ categories, setCategories }) => {
   const handleEditMedicineImage = (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     if (file.size > 2 * 1024 * 1024) {
       alert('Image size must be less than 2MB')
       return
     }
-
     const reader = new FileReader()
     reader.onloadend = () => {
       setEditMedicineForm(prev => ({ ...prev, image: file, imagePreview: reader.result }))
@@ -222,7 +196,61 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     reader.readAsDataURL(file)
   }
 
-  // Save new medicine (POST)
+  // Prescription Toggle Button Component
+  const PrescriptionToggle = ({ value, onChange, disabled }) => (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!value)}
+      disabled={disabled}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '8px 14px',
+        border: 'none',
+        borderRadius: '20px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fontSize: '12px',
+        fontWeight: '600',
+        transition: 'all 0.25s ease',
+        whiteSpace: 'nowrap',
+        backgroundColor: value ? '#fff3e0' : '#e8f5e9',
+        color: value ? '#e65100' : '#2e7d32',
+        boxShadow: value
+          ? '0 0 0 2px #ff9800 inset'
+          : '0 0 0 2px #4caf50 inset',
+        opacity: disabled ? 0.6 : 1,
+        minWidth: '140px',
+        justifyContent: 'center',
+      }}
+    >
+      <span style={{ fontSize: '16px' }}>{value ? '📋' : '✅'}</span>
+      <span>{value ? 'By Prescription' : 'Without Prescription'}</span>
+    </button>
+  )
+
+  // Display badge for read-only rows
+  const PrescriptionBadge = ({ value }) => (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '5px',
+        padding: '4px 10px',
+        borderRadius: '20px',
+        fontSize: '12px',
+        fontWeight: '600',
+        backgroundColor: value ? '#fff3e0' : '#e8f5e9',
+        color: value ? '#e65100' : '#2e7d32',
+        border: `1.5px solid ${value ? '#ff9800' : '#4caf50'}`,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{ fontSize: '13px' }}>{value ? '📋' : '✅'}</span>
+      {value ? 'By Prescription' : 'Without Prescription'}
+    </span>
+  )
+
   const saveMedicine = async (categoryId) => {
     if (!newMedicine.name.trim() || !newMedicine.activeIngredient.trim() || !newMedicine.price.trim()) {
       alert('Please fill in all required fields')
@@ -246,24 +274,20 @@ const GlobalCatalog = ({ categories, setCategories }) => {
       formData.append('ActiveIngredient', newMedicine.activeIngredient.trim())
       formData.append('Price', parseFloat(newMedicine.price))
       formData.append('CategoryId', categoryId)
-      
+      formData.append('RequiresPrescription', newMedicine.requiresPrescription)
+
       if (newMedicine.image) {
-        // Try different parameter names the API might expect
-        formData.append('Image', newMedicine.image)      // Capital I
-        formData.append('image', newMedicine.image)      // lowercase i
-        formData.append('ImageFile', newMedicine.image)  // Alternative name
-        formData.append('file', newMedicine.image)       // Generic name
-        
+        formData.append('Image', newMedicine.image)
+        formData.append('image', newMedicine.image)
+        formData.append('ImageFile', newMedicine.image)
+        formData.append('file', newMedicine.image)
         console.log('📤 Uploading image:', {
           name: newMedicine.image.name,
           size: newMedicine.image.size,
           type: newMedicine.image.type
         })
-      } else {
-        console.warn('⚠️ No image selected')
       }
 
-      // 🔍 DEBUG: Log FormData contents
       console.log('📤 FormData contents:')
       for (let [key, value] of formData.entries()) {
         console.log(`  ${key}:`, value instanceof File ? `FILE: ${value.name}` : value)
@@ -289,42 +313,19 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.log('❌ Error Response:', errorText)
         throw new Error(`Failed to add medicine: ${errorText}`)
       }
 
       const responseText = await response.text()
       console.log('📥 RAW Response (POST):', responseText)
-      
-      let createdData = null
-      try {
-        createdData = JSON.parse(responseText)
-        console.log('✅ Created Medicine Response:', createdData)
-        console.log('🔍 ALL Response Fields:', Object.keys(createdData))
-        
-        // Check for image in response
-        const imageFields = Object.keys(createdData).filter(key => 
-          key.toLowerCase().includes('image') || 
-          key.toLowerCase().includes('url') ||
-          key.toLowerCase().includes('path') ||
-          key.toLowerCase().includes('file')
-        )
-        console.log('🖼️ Possible image fields in response:', imageFields)
-        imageFields.forEach(field => {
-          console.log(`  ${field}:`, createdData[field])
-        })
-      } catch (e) {
-        console.log('⚠️ Response is not JSON')
-      }
 
-      // Wait longer for server to process image
       await new Promise(resolve => setTimeout(resolve, 1500))
       await fetchCategories()
 
       setExpandedCategories(prev => ({ ...prev, [categoryId]: true }))
       setAddingToCategory(null)
-      setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' })
-      
+      setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false })
+
       alert('Medicine added successfully!')
     } catch (err) {
       console.error('❌ Error adding medicine:', err)
@@ -342,11 +343,11 @@ const GlobalCatalog = ({ categories, setCategories }) => {
       activeIngredient: medicine.activeIngredient || '',
       price: medicine.price.replace('$', ''),
       image: null,
-      imagePreview: medicine.image || '' // Show existing image in preview
+      imagePreview: medicine.image || '',
+      requiresPrescription: medicine.requiresPrescription || false
     })
   }
 
-  // Save edited medicine (PUT)
   const saveEditMedicine = async (categoryId, medicineId) => {
     if (!editMedicineForm.name.trim() || !editMedicineForm.activeIngredient.trim() || !editMedicineForm.price.trim()) {
       alert('Please fill in all required fields')
@@ -370,8 +371,8 @@ const GlobalCatalog = ({ categories, setCategories }) => {
       formData.append('ActiveIngredient', editMedicineForm.activeIngredient.trim())
       formData.append('Price', parseFloat(editMedicineForm.price))
       formData.append('CategoryId', categoryId)
-      
-      // Only append image if a NEW file was selected
+      formData.append('RequiresPrescription', editMedicineForm.requiresPrescription)
+
       if (editMedicineForm.image) {
         formData.append('Image', editMedicineForm.image)
         formData.append('image', editMedicineForm.image)
@@ -379,8 +380,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
         formData.append('file', editMedicineForm.image)
         console.log('📤 Updating image:', editMedicineForm.image.name)
       }
-
-      console.log('💾 Updating medicine with FormData...')
 
       const response = await fetch(`${API_BASE_URL}/CentralMedicine/${medicineId}`, {
         method: 'PUT',
@@ -395,32 +394,25 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
       if (response.status === 400) {
         const errorData = await response.json()
-        console.log('❌ Validation Error Response:', errorData)
         const errorMessages = Object.values(errorData.errors || {}).flat().join(', ')
         throw new Error(`Validation error: ${errorMessages}`)
       }
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.log('❌ Error Response:', errorText)
         throw new Error(`Failed to update medicine: ${errorText}`)
       }
 
-      // 🔍 DEBUG: Check PUT response
       const responseText = await response.text()
       console.log('📥 RAW Response (PUT):', responseText)
-      try {
-        const updatedData = JSON.parse(responseText)
-        console.log('✅ Updated Medicine Response:', updatedData)
-      } catch {}
 
       await new Promise(resolve => setTimeout(resolve, 1500))
       await fetchCategories()
 
       setExpandedCategories(prev => ({ ...prev, [categoryId]: true }))
       setEditingMedicine(null)
-      setEditMedicineForm({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' })
-      
+      setEditMedicineForm({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false })
+
       alert('Medicine updated successfully!')
     } catch (err) {
       console.error('❌ Error updating medicine:', err)
@@ -431,10 +423,8 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
   }
 
-  // Delete medicine
   const deleteMedicine = async (categoryId, medicineId) => {
     if (!window.confirm('Are you sure you want to delete this medicine?')) return
-
     if (!isLoggedIn()) {
       alert('Please login to delete medicines')
       return
@@ -472,13 +462,11 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
   }
 
-  // Save new category
   const saveCategory = async () => {
     if (!newCategoryData.name.trim()) {
       alert('Please enter a category name')
       return
     }
-
     if (!isLoggedIn()) {
       alert('Please login to add categories')
       return
@@ -503,7 +491,6 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
       if (response.status === 400) {
         const errorData = await response.json()
-        console.log('❌ Validation Error Response:', errorData)
         const errorMessages = Object.values(errorData.errors || {}).flat().join(', ')
         throw new Error(`Validation error: ${errorMessages}`)
       }
@@ -526,19 +513,16 @@ const GlobalCatalog = ({ categories, setCategories }) => {
     }
   }
 
-  // Delete category
   const deleteCategory = async (categoryId) => {
     const categoryToDelete = categories.find(c => c.id === categoryId)
-    
     if (!categoryToDelete) return
-    
+
     const medicineCount = categoryToDelete.medicines.length
     const confirmMessage = medicineCount > 0
       ? `Are you sure you want to delete "${categoryToDelete.name}"? This will also delete ${medicineCount} medicine(s) in this category.`
       : `Are you sure you want to delete "${categoryToDelete.name}"?`
-    
-    if (!window.confirm(confirmMessage)) return
 
+    if (!window.confirm(confirmMessage)) return
     if (!isLoggedIn()) {
       alert('Please login to delete categories')
       return
@@ -576,6 +560,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
   return (
     <div className="page-content">
       <div className="section">
+
         {/* Header */}
         <div className="section-header">
           <h3 className="section-title">Global Catalog Categories</h3>
@@ -598,14 +583,14 @@ const GlobalCatalog = ({ categories, setCategories }) => {
           </div>
         </div>
 
-        {/* Loading Indicator */}
+        {/* Loading */}
         {loading && (
           <div style={{ padding: '16px', textAlign: 'center', color: '#666', backgroundColor: '#f0f8ff', border: '1px solid #b3d9ff', borderRadius: '4px', marginBottom: '16px' }}>
             ⏳ Loading...
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error */}
         {error && (
           <div style={{ padding: '16px', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', color: '#c00', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
@@ -616,14 +601,19 @@ const GlobalCatalog = ({ categories, setCategories }) => {
           </div>
         )}
 
-        {/* Search Box */}
+        {/* Search */}
         <div className="table-controls">
           <div className="search-box">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
             </svg>
-            <input type="text" placeholder="Search categories..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input
+              type="text"
+              placeholder="Search categories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
         </div>
 
@@ -634,11 +624,23 @@ const GlobalCatalog = ({ categories, setCategories }) => {
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>Category Name</label>
-                <input type="text" placeholder="Enter category name" value={newCategoryData.name} onChange={(e) => setNewCategoryData({ ...newCategoryData, name: e.target.value })} style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }} disabled={loading} />
+                <input
+                  type="text"
+                  placeholder="Enter category name"
+                  value={newCategoryData.name}
+                  onChange={(e) => setNewCategoryData({ ...newCategoryData, name: e.target.value })}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', fontSize: '14px' }}
+                  disabled={loading}
+                />
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', fontWeight: '500' }}>Icon</label>
-                <select value={newCategoryData.icon} onChange={(e) => setNewCategoryData({ ...newCategoryData, icon: e.target.value })} style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px' }} disabled={loading}>
+                <select
+                  value={newCategoryData.icon}
+                  onChange={(e) => setNewCategoryData({ ...newCategoryData, icon: e.target.value })}
+                  style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '16px' }}
+                  disabled={loading}
+                >
                   <option value="💊">💊</option>
                   <option value="💉">💉</option>
                   <option value="🍼">🍼</option>
@@ -650,10 +652,18 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={saveCategory} style={{ padding: '8px 16px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }} disabled={loading}>
+                <button
+                  onClick={saveCategory}
+                  style={{ padding: '8px 16px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                  disabled={loading}
+                >
                   {loading ? 'Saving...' : 'Save'}
                 </button>
-                <button onClick={() => { setAddingCategory(false); setNewCategoryData({ name: '', icon: '💊' }) }} style={{ padding: '8px 16px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }} disabled={loading}>
+                <button
+                  onClick={() => { setAddingCategory(false); setNewCategoryData({ name: '', icon: '💊' }) }}
+                  style={{ padding: '8px 16px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                  disabled={loading}
+                >
                   Cancel
                 </button>
               </div>
@@ -695,7 +705,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
-                    onClick={(e) => { e.stopPropagation(); deleteCategory(category.id); }}
+                    onClick={(e) => { e.stopPropagation(); deleteCategory(category.id) }}
                     style={{ padding: '10px', backgroundColor: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--danger)'; e.currentTarget.style.color = 'white' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--danger)' }}
@@ -703,7 +713,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                     disabled={loading}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                      <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
                     </svg>
                   </button>
                 </div>
@@ -713,7 +723,11 @@ const GlobalCatalog = ({ categories, setCategories }) => {
               {expandedCategories[category.id] && (
                 <div style={{ padding: '16px', backgroundColor: '#fff' }}>
                   <div style={{ marginBottom: '16px' }}>
-                    <button onClick={() => addMedicine(category.id)} style={{ padding: '8px 16px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }} disabled={loading}>
+                    <button
+                      onClick={() => addMedicine(category.id)}
+                      style={{ padding: '8px 16px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                      disabled={loading}
+                    >
                       + Add Medicine
                     </button>
                   </div>
@@ -723,7 +737,8 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                       <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Photo</th>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Medicine Name</th>
-                        <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333', width: '40%' }}>Active Ingredient</th>
+                        <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333', width: '25%' }}>Active Ingredient</th>
+                        <th style={{ textAlign: 'center', padding: '8px', fontWeight: '600', color: '#333', width: '18%' }}>Requires Prescription?</th>
                         <th style={{ textAlign: 'left', padding: '8px', fontWeight: '600', color: '#333' }}>Price</th>
                         <th style={{ textAlign: 'center', padding: '8px', fontWeight: '600', color: '#333' }}>Actions</th>
                       </tr>
@@ -733,6 +748,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                       {/* Add New Medicine Row */}
                       {addingToCategory === category.id && (
                         <tr style={{ borderBottom: '1px solid #f0f0f0', backgroundColor: '#f9f9f9' }}>
+                          {/* Photo */}
                           <td style={{ padding: '12px 8px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
                               {newMedicine.imagePreview ? (
@@ -750,19 +766,72 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                               </label>
                             </div>
                           </td>
+
+                          {/* Name */}
                           <td style={{ padding: '12px 8px' }}>
-                            <input type="text" placeholder="Medicine name *" value={newMedicine.name} onChange={(e) => setNewMedicine({ ...newMedicine, name: e.target.value })} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} disabled={loading} />
+                            <input
+                              type="text"
+                              placeholder="Medicine name *"
+                              value={newMedicine.name}
+                              onChange={(e) => setNewMedicine({ ...newMedicine, name: e.target.value })}
+                              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                              disabled={loading}
+                            />
                           </td>
+
+                          {/* Active Ingredient */}
                           <td style={{ padding: '12px 8px' }}>
-                            <textarea placeholder="Active ingredient *" value={newMedicine.activeIngredient} onChange={(e) => setNewMedicine({ ...newMedicine, activeIngredient: e.target.value })} rows={3} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical', fontSize: '13px', fontFamily: 'inherit', minHeight: '60px' }} disabled={loading} />
+                            <textarea
+                              placeholder="Active ingredient *"
+                              value={newMedicine.activeIngredient}
+                              onChange={(e) => setNewMedicine({ ...newMedicine, activeIngredient: e.target.value })}
+                              rows={3}
+                              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical', fontSize: '13px', fontFamily: 'inherit', minHeight: '60px' }}
+                              disabled={loading}
+                            />
                           </td>
+
+                          {/* ✅ Requires Prescription Toggle */}
+                          <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                              <PrescriptionToggle
+                                value={newMedicine.requiresPrescription}
+                                onChange={(val) => setNewMedicine({ ...newMedicine, requiresPrescription: val })}
+                                disabled={loading}
+                              />
+                              <span style={{ fontSize: '10px', color: '#999' }}>Click to toggle</span>
+                            </div>
+                          </td>
+
+                          {/* Price */}
                           <td style={{ padding: '12px 8px' }}>
-                            <input type="number" placeholder="Price *" value={newMedicine.price} onChange={(e) => setNewMedicine({ ...newMedicine, price: e.target.value })} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} disabled={loading} />
+                            <input
+                              type="number"
+                              placeholder="Price *"
+                              value={newMedicine.price}
+                              onChange={(e) => setNewMedicine({ ...newMedicine, price: e.target.value })}
+                              style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                              disabled={loading}
+                            />
                           </td>
+
+                          {/* Actions */}
                           <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                              <button onClick={() => saveMedicine(category.id)} style={{ padding: '4px 12px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Save</button>
-                              <button onClick={() => { setAddingToCategory(null); setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' }) }} style={{ padding: '4px 12px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Cancel</button>
+                              <button
+                                onClick={() => saveMedicine(category.id)}
+                                style={{ padding: '4px 12px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                disabled={loading}
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => { setAddingToCategory(null); setNewMedicine({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false }) }}
+                                style={{ padding: '4px 12px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                disabled={loading}
+                              >
+                                Cancel
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -772,6 +841,8 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                       {category.medicines.length > 0 ? (
                         category.medicines.map((medicine) => (
                           <tr key={medicine.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+
+                            {/* Photo */}
                             <td style={{ padding: '12px 8px' }}>
                               {editingMedicine === medicine.id ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
@@ -789,29 +860,16 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                                 </div>
                               ) : (
                                 medicine.image ? (
-                                  <img 
-                                    src={medicine.image} 
-                                    alt={medicine.name} 
-                                    style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #ddd' }} 
-                                    onLoad={(e) => {
-                                      console.log(`✅ Image loaded successfully: ${medicine.image}`)
-                                    }}
-                                    onError={(e) => { 
-                                      console.error(`❌ Image failed to load: ${medicine.image}`)
-                                      console.log('Trying alternative paths...')
-                                      
-                                      // Try alternative paths
-                                      const alternatives = [
-                                        `${BASE_URL}/${medicine.image.split('/').pop()}`,
-                                        `${BASE_URL}/uploads/${medicine.image.split('/').pop()}`,
-                                        `${BASE_URL}/images/${medicine.image.split('/').pop()}`,
-                                      ]
-                                      
-                                      console.log('Alternative URLs:', alternatives)
-                                      
+                                  <img
+                                    src={medicine.image}
+                                    alt={medicine.name}
+                                    style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #ddd' }}
+                                    onLoad={() => console.log(`✅ Image loaded: ${medicine.image}`)}
+                                    onError={(e) => {
+                                      console.error(`❌ Image failed: ${medicine.image}`)
                                       e.target.onerror = null
                                       e.target.src = 'https://via.placeholder.com/50?text=No+Image'
-                                    }} 
+                                    }}
                                   />
                                 ) : (
                                   <div style={{ width: '50px', height: '50px', borderRadius: '6px', border: '2px dashed #e0e0e0', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafafa' }}>
@@ -820,40 +878,108 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                                 )
                               )}
                             </td>
+
+                            {/* Name */}
                             <td style={{ padding: '12px 8px' }}>
                               {editingMedicine === medicine.id ? (
-                                <input type="text" value={editMedicineForm.name} onChange={(e) => setEditMedicineForm({ ...editMedicineForm, name: e.target.value })} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} disabled={loading} />
+                                <input
+                                  type="text"
+                                  value={editMedicineForm.name}
+                                  onChange={(e) => setEditMedicineForm({ ...editMedicineForm, name: e.target.value })}
+                                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                                  disabled={loading}
+                                />
                               ) : (
                                 <span style={{ fontWeight: '500' }}>{medicine.name}</span>
                               )}
                             </td>
+
+                            {/* Active Ingredient */}
                             <td style={{ padding: '12px 8px' }}>
                               {editingMedicine === medicine.id ? (
-                                <textarea value={editMedicineForm.activeIngredient} onChange={(e) => setEditMedicineForm({ ...editMedicineForm, activeIngredient: e.target.value })} rows={3} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical', fontSize: '13px', fontFamily: 'inherit', minHeight: '60px' }} disabled={loading} />
+                                <textarea
+                                  value={editMedicineForm.activeIngredient}
+                                  onChange={(e) => setEditMedicineForm({ ...editMedicineForm, activeIngredient: e.target.value })}
+                                  rows={3}
+                                  style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', resize: 'vertical', fontSize: '13px', fontFamily: 'inherit', minHeight: '60px' }}
+                                  disabled={loading}
+                                />
                               ) : (
-                                <span style={{ color: '#555', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{medicine.activeIngredient || '-'}</span>
+                                <span style={{ color: '#555', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>
+                                  {medicine.activeIngredient || '-'}
+                                </span>
                               )}
                             </td>
+
+                            {/* ✅ Requires Prescription */}
+                            <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                              {editingMedicine === medicine.id ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                  <PrescriptionToggle
+                                    value={editMedicineForm.requiresPrescription}
+                                    onChange={(val) => setEditMedicineForm({ ...editMedicineForm, requiresPrescription: val })}
+                                    disabled={loading}
+                                  />
+                                  <span style={{ fontSize: '10px', color: '#999' }}>Click to toggle</span>
+                                </div>
+                              ) : (
+                                <PrescriptionBadge value={medicine.requiresPrescription} />
+                              )}
+                            </td>
+
+                            {/* Price */}
                             <td style={{ padding: '12px 8px' }}>
                               {editingMedicine === medicine.id ? (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <span style={{ color: '#666' }}>$</span>
-                                  <input type="number" value={editMedicineForm.price} onChange={(e) => setEditMedicineForm({ ...editMedicineForm, price: e.target.value })} style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }} disabled={loading} />
+                                  <input
+                                    type="number"
+                                    value={editMedicineForm.price}
+                                    onChange={(e) => setEditMedicineForm({ ...editMedicineForm, price: e.target.value })}
+                                    style={{ width: '100%', padding: '6px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' }}
+                                    disabled={loading}
+                                  />
                                 </div>
                               ) : (
                                 <span style={{ color: '#2e7d32', fontWeight: '600' }}>{medicine.price}</span>
                               )}
                             </td>
+
+                            {/* Actions */}
                             <td style={{ padding: '12px 8px', textAlign: 'center' }}>
                               {editingMedicine === medicine.id ? (
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                  <button onClick={() => saveEditMedicine(category.id, medicine.id)} style={{ padding: '4px 12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Save</button>
-                                  <button onClick={() => { setEditingMedicine(null); setEditMedicineForm({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '' }) }} style={{ padding: '4px 12px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Cancel</button>
+                                  <button
+                                    onClick={() => saveEditMedicine(category.id, medicine.id)}
+                                    style={{ padding: '4px 12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                    disabled={loading}
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingMedicine(null); setEditMedicineForm({ name: '', activeIngredient: '', price: '', image: null, imagePreview: '', requiresPrescription: false }) }}
+                                    style={{ padding: '4px 12px', backgroundColor: '#999', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                    disabled={loading}
+                                  >
+                                    Cancel
+                                  </button>
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                  <button onClick={() => handleEditMedicine(medicine)} style={{ padding: '4px 12px', backgroundColor: 'var(--primary-gold)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Edit</button>
-                                  <button onClick={() => deleteMedicine(category.id, medicine.id)} style={{ padding: '4px 12px', backgroundColor: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }} disabled={loading}>Delete</button>
+                                  <button
+                                    onClick={() => handleEditMedicine(medicine)}
+                                    style={{ padding: '4px 12px', backgroundColor: 'var(--primary-gold)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                    disabled={loading}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => deleteMedicine(category.id, medicine.id)}
+                                    style={{ padding: '4px 12px', backgroundColor: 'var(--danger)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                    disabled={loading}
+                                  >
+                                    Delete
+                                  </button>
                                 </div>
                               )}
                             </td>
@@ -861,7 +987,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="5" style={{ padding: '12px', textAlign: 'center', color: '#999' }}>
+                          <td colSpan="6" style={{ padding: '12px', textAlign: 'center', color: '#999' }}>
                             No medicines in this category
                           </td>
                         </tr>
