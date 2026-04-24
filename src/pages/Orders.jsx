@@ -1,330 +1,407 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+
+const BASE_URL = 'http://165.22.91.187:5000/api/AdminOrder'
+
+const getToken = () =>
+  localStorage.getItem('token')       ||
+  localStorage.getItem('authToken')   ||
+  localStorage.getItem('accessToken') ||
+  sessionStorage.getItem('token')     ||
+  null
+
+const authHeaders = () => {
+  const token = getToken()
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+const str = (val) => (val == null ? '' : String(val))
 
 const Orders = () => {
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchTerm, setSearchTerm]               = useState('')
   const [expandedMedicines, setExpandedMedicines] = useState({})
-  const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({})
-  const [deleteLoadingId, setDeleteLoadingId] = useState(null)
-  const [editLoading, setEditLoading] = useState(false)
-  const [orders, setOrders] = useState([
-    {
-      id: '#ORD-8821',
-      pharmacy: 'Green Valley Meds',
-      patient: 'John Smith',
-      driver: 'Alex Rivera',
-      status: 'delivered',
-      value: '$42.50',
-      date: '2024-01-15',
-      medicines: [
-        { name: 'Paracetamol 500mg', qty: 2, price: '$5.99' },
-        { name: 'Vitamin C 1000mg',  qty: 1, price: '$8.99' },
-        { name: 'Aspirin 100mg',     qty: 3, price: '$3.99' },
-      ]
-    },
-    {
-      id: '#ORD-8820',
-      pharmacy: 'Central Health Hub',
-      patient: 'Emma Johnson',
-      driver: 'Sarah Chen',
-      status: 'delivered',
-      value: '$65.00',
-      date: '2024-01-15',
-      medicines: [
-        { name: 'Ibuprofen 400mg',  qty: 1, price: '$4.50' },
-        { name: 'Metformin 500mg',  qty: 2, price: '$12.99' },
-      ]
-    },
-    {
-      id: '#ORD-8819',
-      pharmacy: 'Central Health Hub',
-      patient: 'Michael Brown',
-      driver: 'Sarah Chen',
-      status: 'picked-up',
-      value: '$118.00',
-      date: '2024-01-14',
-      medicines: [
-        { name: 'Insulin Glargine',    qty: 1, price: '$89.00' },
-        { name: 'Amoxicillin 250mg',   qty: 2, price: '$12.50' },
-      ]
-    },
-    {
-      id: '#ORD-8818',
-      pharmacy: 'Sunset Pharmacy',
-      patient: 'Sarah Davis',
-      driver: 'Mark Jenkins',
-      status: 'pending',
-      value: '$15.20',
-      date: '2024-01-14',
-      medicines: [
-        { name: 'Bandages Pack', qty: 2, price: '$2.99' },
-        { name: 'Baby Powder',   qty: 1, price: '$6.99' },
-      ]
-    },
-    {
-      id: '#ORD-8817',
-      pharmacy: 'Apex Pharma Care',
-      patient: 'Robert Wilson',
-      driver: 'Jessica Wong',
-      status: 'delivered',
-      value: '$210.44',
-      date: '2024-01-13',
-      medicines: [
-        { name: 'Azithromycin 500mg', qty: 1, price: '$15.99' },
-        { name: 'Vitamin B Complex',  qty: 3, price: '$10.50' },
-        { name: 'Face Cream SPF30',   qty: 2, price: '$22.99' },
-        { name: 'Insulin Glargine',   qty: 1, price: '$89.00' },
-      ]
-    },
-    {
-      id: '#ORD-8816',
-      pharmacy: 'MedPlus Express',
-      patient: 'Lisa Anderson',
-      driver: 'David Miller',
-      status: 'delivered',
-      value: '$89.99',
-      date: '2024-01-13',
-      medicines: [
-        { name: 'Vitamin D3',      qty: 2, price: '$9.99'  },
-        { name: 'Ibuprofen 400mg', qty: 1, price: '$4.50'  },
-        { name: 'Baby Oil',        qty: 1, price: '$7.50'  },
-      ]
-    },
-  ])
+  const [orders, setOrders]                       = useState([])
+  const [success, setSuccess]                     = useState('')
+  const [error, setError]                         = useState('')
+  const [loading, setLoading]                     = useState(false)
+  const [activeTab, setActiveTab]                 = useState('all')
+  const [deleteLoadingId, setDeleteLoadingId]     = useState(null)
 
-  const [success, setSuccess] = useState('')
-  const [error, setError]     = useState('')
+  // Global delivery fee — kept separately so fetchOrders can't wipe it
+  const [globalDeliveryFee, setGlobalDeliveryFee] = useState(null)
 
-  const statusOptions = ['pending', 'picked-up', 'delivered', 'cancelled']
+  const [deliveryFeeModal, setDeliveryFeeModal]     = useState(false)
+  const [deliveryFeeValue, setDeliveryFeeValue]     = useState('')
+  const [deliveryFeeLoading, setDeliveryFeeLoading] = useState(false)
 
-  const filteredOrders = orders
-  .filter(order =>
-    order.id.toLowerCase().includes(searchTerm.toLowerCase())       ||
-    order.pharmacy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.patient.toLowerCase().includes(searchTerm.toLowerCase())  ||
-    order.driver.toLowerCase().includes(searchTerm.toLowerCase())   ||
-    order.status.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-  .sort((a, b) => new Date(b.date) - new Date(a.date))
+  const showSuccess = (msg) => { setSuccess(msg); setTimeout(() => setSuccess(''), 4000) }
+  const showError   = (msg) => { setError(msg);   setTimeout(() => setError(''), 8000)  }
 
-  const toggleMedicines = (orderId) => {
-    setExpandedMedicines(prev => ({
-      ...prev,
-      [orderId]: !prev[orderId]
+  // ─── Generic JSON fetch ────────────────────────────────────────────────────
+  const apiFetch = useCallback(async (url, options = {}) => {
+    const res  = await fetch(url, {
+      ...options,
+      headers: { ...authHeaders(), ...(options.headers || {}) },
+    })
+    const text = await res.text()
+    let body   = {}
+    try { body = JSON.parse(text) } catch { body = { raw: text } }
+
+    if (res.status === 401) throw new Error('Unauthorized – please log in again.')
+    if (res.status === 403) throw new Error('Forbidden – you do not have permission.')
+    if (res.status === 204) return null
+    if (!res.ok) {
+      const errArr =
+        Array.isArray(body?.errors)
+          ? body.errors.join(', ')
+          : typeof body?.errors === 'object' && body?.errors !== null
+          ? Object.values(body.errors).flat().join(', ')
+          : null
+      const msg = body?.message || body?.title || errArr || `Server error: ${res.status}`
+      const err = new Error(msg)
+      err.status = res.status
+      err.body   = body
+      throw err
+    }
+    return body
+  }, [])
+
+  // ─── Delivery-fee PUT  (JSON string decimal — confirmed working format) ───
+  const updateDeliveryFee = useCallback(async (fee) => {
+    const token = getToken()
+    const res   = await fetch(`${BASE_URL}/delivery-fee`, {
+      method:  'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(fee.toFixed(2)),   // ✅ raw JSON string e.g. "5.00"
+    })
+
+    const text = await res.text()
+    let body   = {}
+    try { body = JSON.parse(text) } catch { body = { raw: text } }
+
+    if (!res.ok) {
+      throw new Error(body?.message || body?.title || `Server error: ${res.status}`)
+    }
+    return body   // { message, deliveryFee }
+  }, [])
+
+  // ─── Normalize ─────────────────────────────────────────────────────────────
+  const normalizeOrder = useCallback((raw) => {
+    const medicines = (raw.orderItems || []).map((item) => ({
+      name:  str(item.medicationName || item.name),
+      qty:   Number(item.quantity || item.qty || 1),
+      price: str(
+        item.pricePerUnit != null
+          ? `$${Number(item.pricePerUnit).toFixed(2)}`
+          : item.price || '$0.00'
+      ),
+      image: item.medicationImage || null,
+      total: item.totalPrice || 0,
     }))
-  }
-
-  const handleEdit = (order) => {
-    setEditingId(order.id)
-    setEditForm({ ...order })
-    setError('')
-    setSuccess('')
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
-    setEditForm({})
-    setError('')
-  }
-
-  const handleSave = async () => {
-    if (!editForm.pharmacy?.trim() || !editForm.patient?.trim() || !editForm.driver?.trim()) {
-      setError('Pharmacy, Patient and Driver fields are required.')
-      return
+    return {
+      id:                str(raw.id),
+      pharmacy:          str(raw.pharmacyName || raw.pharmacy),
+      patient:           str(raw.patientName  || raw.patient),
+      driver:            str(raw.driverName   || raw.driver || 'Unassigned'),
+      status:            str(raw.status).toLowerCase(),
+      value:             str(raw.totalPrice != null
+                           ? `$${Number(raw.totalPrice).toFixed(2)}`
+                           : raw.value || '$0.00'),
+      date:              str(raw.createdAt).slice(0, 10),
+      deliveryFee:       Number(raw.deliveryFee ?? 0),
+      subTotal:          Number(raw.subTotal   ?? 0),
+      medicines,
+      prescriptionImage: raw.prescriptionImage,
     }
+  }, [])
 
-    setEditLoading(true)
+  // ─── Fetch orders ──────────────────────────────────────────────────────────
+  const fetchOrders = useCallback(async () => {
+    setLoading(true)
     setError('')
-    setSuccess('')
-
     try {
-      // Simulate API call - replace with real API
-      await new Promise(resolve => setTimeout(resolve, 600))
+      const urlMap = {
+        all:     BASE_URL,
+        active:  `${BASE_URL}/active`,
+        history: `${BASE_URL}/history`,
+      }
+      const data    = await apiFetch(urlMap[activeTab])
+      const rawList = Array.isArray(data)
+        ? data
+        : data?.orders || data?.data || data?.result || []
 
-      setOrders(prev => prev.map(o =>
-        o.id === editingId ? { ...editForm } : o
-      ))
-      setEditingId(null)
-      setEditForm({})
-      setSuccess('Order updated successfully!')
-      setTimeout(() => setSuccess(''), 4000)
+      const normalized = rawList.map(normalizeOrder)
+      setOrders(normalized)
+
+      // If we have a confirmed global fee, keep it — don't let the server
+      // response overwrite it with stale data
+      setGlobalDeliveryFee(prev => {
+        if (prev !== null) return prev           // keep our confirmed value
+        // first load: read from first order as default display
+        return normalized[0]?.deliveryFee ?? 0
+      })
     } catch (err) {
-      setError(`Failed to update order: ${err.message}`)
+      showError(err.message)
     } finally {
-      setEditLoading(false)
+      setLoading(false)
     }
-  }
+  }, [activeTab, apiFetch, normalizeOrder])
 
+  useEffect(() => {
+    // Reset global fee when tab changes so it re-reads from server
+    setGlobalDeliveryFee(null)
+    fetchOrders()
+  }, [activeTab])
+
+  // ─── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this order?')) return
     setDeleteLoadingId(id)
-    setError('')
-    setSuccess('')
-
     try {
-      // Simulate API call - replace with real API
-      await new Promise(resolve => setTimeout(resolve, 600))
-
+      await apiFetch(`${BASE_URL}/${id}`, { method: 'DELETE' })
       setOrders(prev => prev.filter(o => o.id !== id))
-      setSuccess('Order deleted successfully!')
-      setTimeout(() => setSuccess(''), 4000)
+      showSuccess('Order deleted successfully!')
     } catch (err) {
-      setError(`Failed to delete order: ${err.message}`)
+      showError(err.message)
     } finally {
       setDeleteLoadingId(null)
     }
   }
 
-  const handleMedicineChange = (index, field, value) => {
-    const updatedMedicines = [...(editForm.medicines || [])]
-    updatedMedicines[index] = { ...updatedMedicines[index], [field]: value }
-    setEditForm({ ...editForm, medicines: updatedMedicines })
+  // ─── Open delivery fee modal ───────────────────────────────────────────────
+  const openDeliveryFeeModal = () => {
+    setDeliveryFeeValue(
+      globalDeliveryFee !== null ? String(globalDeliveryFee) : ''
+    )
+    setDeliveryFeeModal(true)
+    setError('')
   }
 
-  const handleAddMedicineRow = () => {
-    setEditForm({
-      ...editForm,
-      medicines: [...(editForm.medicines || []), { name: '', qty: 1, price: '' }]
-    })
+  // ─── Submit delivery fee ───────────────────────────────────────────────────
+  const handleDeliveryFeeSubmit = async () => {
+    const fee = parseFloat(deliveryFeeValue)
+    if (isNaN(fee) || fee < 0) {
+      showError('Please enter a valid delivery fee (0 or more).')
+      return
+    }
+
+    setDeliveryFeeLoading(true)
+    setError('')
+
+    try {
+      const response    = await updateDeliveryFee(fee)
+      const confirmed   = typeof response?.deliveryFee === 'number'
+        ? response.deliveryFee
+        : fee
+
+      // ── Persist the new fee in our separate state so re-fetches can't wipe it
+      setGlobalDeliveryFee(confirmed)
+
+      setDeliveryFeeModal(false)
+      setDeliveryFeeValue('')
+      showSuccess(`Global delivery fee set to $${confirmed.toFixed(2)}!`)
+    } catch (err) {
+      showError(`Failed to update delivery fee: ${err.message}`)
+    } finally {
+      setDeliveryFeeLoading(false)
+    }
   }
 
-  const handleRemoveMedicineRow = (index) => {
-    const updatedMedicines = (editForm.medicines || []).filter((_, i) => i !== index)
-    setEditForm({ ...editForm, medicines: updatedMedicines })
+  // ─── Toggle medicines ──────────────────────────────────────────────────────
+  const toggleMedicines = (id) =>
+    setExpandedMedicines(prev => ({ ...prev, [id]: !prev[id] }))
+
+  // ─── Filter & sort ─────────────────────────────────────────────────────────
+  const filteredOrders = orders
+    .filter(o =>
+      str(o.id).toLowerCase().includes(searchTerm.toLowerCase())       ||
+      str(o.pharmacy).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      str(o.patient).toLowerCase().includes(searchTerm.toLowerCase())  ||
+      str(o.driver).toLowerCase().includes(searchTerm.toLowerCase())   ||
+      str(o.status).toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+
+  // ─── Status colours ────────────────────────────────────────────────────────
+  const getStatusStyle = (status) => {
+    const s = str(status).toLowerCase().trim()
+    switch (s) {
+      case 'delivered':
+      case 'done':
+      case 'completed':
+        return { bg: '#e8f5e9', color: '#2e7d32', border: '#4caf50',
+                 label: s === 'done' ? 'Done' : s === 'completed' ? 'Completed' : 'Delivered' }
+      case 'picked-up':
+      case 'picked up':
+      case 'in transit':
+      case 'out for delivery':
+        return { bg: '#e3f2fd', color: '#1565c0', border: '#2196f3', label: 'Picked Up' }
+      case 'pending':
+      case 'ready':
+      case 'ready for pickup':
+      case 'processing':
+        return { bg: '#fff3e0', color: '#e65100', border: '#ff9800',
+                 label: s === 'ready' || s === 'ready for pickup' ? 'Ready'
+                      : s === 'processing' ? 'Processing' : 'Pending' }
+      case 'cancelled':
+      case 'canceled':
+      case 'rejected':
+      case 'failed':
+        return { bg: '#ffebee', color: '#b71c1c', border: '#f44336',
+                 label: s === 'rejected' ? 'Rejected'
+                      : s === 'failed'   ? 'Failed' : 'Cancelled' }
+      default:
+        return { bg: '#f5f5f5', color: '#424242', border: '#9e9e9e', label: status }
+    }
   }
 
   const inputStyle = {
-    width: '100%',
-    padding: '6px 8px',
-    border: '1px solid var(--gray-300)',
-    borderRadius: '4px',
-    fontSize: '13px',
-    boxSizing: 'border-box'
+    width: '100%', padding: '6px 8px',
+    border: '1px solid var(--gray-300)', borderRadius: '4px',
+    fontSize: '13px', boxSizing: 'border-box',
   }
+  const tabStyle = (active) => ({
+    padding: '7px 18px', border: 'none', borderRadius: '20px',
+    cursor: 'pointer', fontSize: '13px', fontWeight: '500', transition: 'all 0.2s',
+    backgroundColor: active ? 'var(--primary, #1976d2)' : '#f3f4f6',
+    color: active ? '#fff' : '#374151',
+  })
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'delivered':  return { bg: '#e8f5e9', color: '#2e7d32', border: '#4caf50' }
-      case 'picked-up':  return { bg: '#e3f2fd', color: '#1565c0', border: '#2196f3' }
-      case 'pending':    return { bg: '#fff8e1', color: '#f57f17', border: '#ffc107' }
-      case 'cancelled':  return { bg: '#ffebee', color: '#c62828', border: '#f44336' }
-      default:           return { bg: '#f5f5f5', color: '#616161', border: '#9e9e9e' }
-    }
-  }
+  // ── display fee: prefer our confirmed global value ─────────────────────────
+  const displayFee = globalDeliveryFee !== null ? globalDeliveryFee : 0
 
   return (
     <div className="page-content">
       <div className="section">
-        <div className="section-header">
+
+        {/* Header */}
+        <div
+          className="section-header"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}
+        >
           <h3 className="section-title">All Orders</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '6px', backgroundColor: '#f3f4f6', borderRadius: '24px', padding: '4px' }}>
+              {[
+                { key: 'all',     label: 'All Orders' },
+                { key: 'active',  label: 'Active'     },
+                { key: 'history', label: 'History'    },
+              ].map(t => (
+                <button key={t.key} style={tabStyle(activeTab === t.key)} onClick={() => setActiveTab(t.key)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Global delivery fee button — shows current value */}
+            <button
+              onClick={openDeliveryFeeModal}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '8px 16px',
+                backgroundColor: '#fff3e0',
+                color: '#f57c00',
+                border: '1px solid #f57c00',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: '600',
+              }}
+            >
+              🚚 Delivery Fee
+              <span style={{
+                backgroundColor: '#f57c00',
+                color: '#fff',
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                fontWeight: '700',
+              }}>
+                ${displayFee.toFixed(2)}
+              </span>
+            </button>
+
+            <button
+              onClick={fetchOrders}
+              disabled={loading}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', backgroundColor: '#e3f2fd', color: '#1565c0', border: '1px solid #2196f3', borderRadius: '8px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: '600' }}
+            >
+              {loading ? '⏳' : '🔄'} Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Success */}
-        {success && (
-          <div className='success-message'>
-            <span>✅</span><span>{success}</span>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className='error-message'>
-            <span>⚠️</span><span>{error}</span>
-          </div>
-        )}
+        {/* Alerts */}
+        {success && <div className="success-message"><span>✅</span><span>{success}</span></div>}
+        {error   && <div className="error-message"><span>⚠️</span><span>{error}</span></div>}
 
         {/* Search */}
         <div className="table-controls">
           <div className="search-box">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.35-4.35"/>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             <input
               type="text"
-              placeholder="Search by order ID, pharmacy, patient, driver or status..."
+              placeholder="Search by order ID, pharmacy, patient, driver or status…"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
+        {/* Table */}
         <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Order ID</th>
-                <th>Pharmacy</th>
-                <th>Patient</th>
-                <th>Driver</th>
-                <th>Medicines</th>
-                <th>Status</th>
-                <th>Value</th>
-                <th>Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.length === 0 ? (
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#888' }}>
+              <div style={{ width: '36px', height: '36px', border: '4px solid #e0e0e0', borderTop: '4px solid #1976d2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+              Loading orders…
+            </div>
+          )}
+
+          {!loading && (
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
-                    {searchTerm ? 'No orders match your search.' : 'No orders found.'}
-                  </td>
+                  <th>Order ID</th>
+                  <th>Pharmacy</th>
+                  <th>Patient</th>
+                  <th>Driver</th>
+                  <th>Medicines</th>
+                  <th>Status</th>
+                  <th>Subtotal</th>
+                  <th>Delivery Fee</th>
+                  <th>Total</th>
+                  <th>Date</th>
+                  <th>Actions</th>
                 </tr>
-              ) : (
-                filteredOrders.map((order) => (
-                  <React.Fragment key={order.id}>
-                    <tr style={{ borderBottom: expandedMedicines[order.id] ? 'none' : undefined }}>
+              </thead>
+              <tbody>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="11" style={{ textAlign: 'center', padding: '40px', color: 'var(--medium-gray)' }}>
+                      {searchTerm ? 'No orders match your search.' : 'No orders found.'}
+                    </td>
+                  </tr>
+                ) : filteredOrders.map((order) => {
+                  const ss = getStatusStyle(order.status)
+                  return (
+                    <React.Fragment key={order.id}>
+                      <tr style={{ borderBottom: expandedMedicines[order.id] ? 'none' : undefined }}>
 
-                      {/* Order ID */}
-                      <td className="order-id">
-                        {editingId === order.id ? (
-                          <input
-                            type="text"
-                            value={editForm.id || ''}
-                            onChange={(e) => setEditForm({ ...editForm, id: e.target.value })}
-                            style={inputStyle}
-                          />
-                        ) : order.id}
-                      </td>
+                        <td className="order-id">{order.id}</td>
+                        <td>{order.pharmacy}</td>
+                        <td>{order.patient}</td>
 
-                      {/* Pharmacy */}
-                      <td>
-                        {editingId === order.id ? (
-                          <input
-                            type="text"
-                            value={editForm.pharmacy || ''}
-                            onChange={(e) => setEditForm({ ...editForm, pharmacy: e.target.value })}
-                            style={inputStyle}
-                            placeholder="Pharmacy name"
-                          />
-                        ) : order.pharmacy}
-                      </td>
-
-                      {/* Patient */}
-                      <td>
-                        {editingId === order.id ? (
-                          <input
-                            type="text"
-                            value={editForm.patient || ''}
-                            onChange={(e) => setEditForm({ ...editForm, patient: e.target.value })}
-                            style={inputStyle}
-                            placeholder="Patient name"
-                          />
-                        ) : order.patient}
-                      </td>
-
-                      {/* Driver */}
-                      <td>
-                        {editingId === order.id ? (
-                          <input
-                            type="text"
-                            value={editForm.driver || ''}
-                            onChange={(e) => setEditForm({ ...editForm, driver: e.target.value })}
-                            style={inputStyle}
-                            placeholder="Driver name"
-                          />
-                        ) : (
+                        {/* Driver */}
+                        <td>
                           <div className="driver-info">
                             <img
                               src={`https://ui-avatars.com/api/?name=${encodeURIComponent(order.driver)}&background=FFD700&color=fff`}
@@ -333,310 +410,262 @@ const Orders = () => {
                             />
                             <span>{order.driver}</span>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Medicines */}
-                      <td>
-                        <button
-                          onClick={() => toggleMedicines(order.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '5px 12px',
-                            backgroundColor: expandedMedicines[order.id] ? '#fff3e0' : '#f3f4f6',
-                            color: expandedMedicines[order.id] ? 'var(--warning)' : '#374151',
-                            border: `1px solid ${expandedMedicines[order.id] ? 'var(--warning)' : '#d1d5db'}`,
-                            borderRadius: '20px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: '500',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
-                          </svg>
-                          {order.medicines?.length || 0} item{(order.medicines?.length || 0) !== 1 ? 's' : ''}
-                          <span style={{ fontSize: '10px' }}>
-                            {expandedMedicines[order.id] ? '▲' : '▼'}
-                          </span>
-                        </button>
-                      </td>
-
-                      {/* Status */}
-                      <td>
-                        {editingId === order.id ? (
-                          <select
-                            value={editForm.status || ''}
-                            onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                            style={inputStyle}
+                        {/* Medicines toggle */}
+                        <td>
+                          <button
+                            onClick={() => toggleMedicines(order.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '6px',
+                              padding: '5px 12px',
+                              backgroundColor: expandedMedicines[order.id] ? '#fff3e0' : '#f3f4f6',
+                              color: expandedMedicines[order.id] ? 'var(--warning)' : '#374151',
+                              border: `1px solid ${expandedMedicines[order.id] ? 'var(--warning)' : '#d1d5db'}`,
+                              borderRadius: '20px', cursor: 'pointer',
+                              fontSize: '12px', fontWeight: '500', whiteSpace: 'nowrap',
+                            }}
                           >
-                            {statusOptions.map(s => (
-                              <option key={s} value={s}>{s.replace('-', ' ')}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className={`status-badge ${order.status}`}>
-                            {order.status.replace('-', ' ')}
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+                            </svg>
+                            {order.medicines?.length || 0} item{(order.medicines?.length || 0) !== 1 ? 's' : ''}
+                            <span style={{ fontSize: '10px' }}>{expandedMedicines[order.id] ? '▲' : '▼'}</span>
+                          </button>
+                        </td>
+
+                        {/* Status */}
+                        <td>
+                          <span style={{
+                            display: 'inline-block', padding: '4px 12px',
+                            borderRadius: '12px', fontSize: '12px', fontWeight: '600',
+                            textTransform: 'capitalize',
+                            backgroundColor: ss.bg, color: ss.color,
+                            border: `1px solid ${ss.border}`,
+                            letterSpacing: '0.3px',
+                          }}>
+                            {ss.label}
                           </span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Value */}
-                      <td className="value-cell">
-                        {editingId === order.id ? (
-                          <input
-                            type="text"
-                            value={editForm.value || ''}
-                            onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
-                            style={inputStyle}
-                            placeholder="$0.00"
-                          />
-                        ) : order.value}
-                      </td>
+                        {/* Subtotal */}
+                        <td style={{ color: '#555' }}>${order.subTotal.toFixed(2)}</td>
 
-                      {/* Date */}
-                      <td>
-                        {editingId === order.id ? (
-                          <input
-                            type="date"
-                            value={editForm.date || ''}
-                            onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                            style={inputStyle}
-                          />
-                        ) : order.date}
-                      </td>
+                        {/* Delivery Fee — always shows globalDeliveryFee */}
+                        <td>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            backgroundColor: '#e3f2fd',
+                            color: '#1565c0',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            borderRadius: '8px',
+                            border: '1px solid #90caf9',
+                          }}>
+                            ${displayFee.toFixed(2)}
+                          </span>
+                        </td>
 
-                      {/* Actions */}
-                      <td>
-                        {editingId === order.id ? (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              className="action-btn"
-                              title="Save"
-                              onClick={handleSave}
-                              disabled={editLoading}
-                            >
-                              {editLoading ? (
-                                <span style={{ width: '14px', height: '14px', border: '2px solid #ccc', borderTop: '2px solid #333', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                              ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                  <polyline points="17 21 17 13 7 13 7 21"/>
-                                  <polyline points="7 3 7 8 15 8"/>
-                                </svg>
-                              )}
-                            </button>
-                            <button
-                              className="action-btn delete-btn"
-                              title="Cancel"
-                              onClick={handleCancel}
-                              disabled={editLoading}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
+                        {/* Total */}
+                        <td style={{ fontWeight: '700', color: 'var(--success, #2e7d32)' }}>
+                          {order.value}
+                        </td>
+
+                        {/* Date */}
+                        <td>{order.date}</td>
+
+                        {/* Actions */}
+                        <td>
+                          <button
+                            className="action-btn delete-btn"
+                            title="Delete"
+                            onClick={() => handleDelete(order.id)}
+                            disabled={deleteLoadingId === order.id}
+                            style={{ background: 'none', border: 'none', cursor: deleteLoadingId === order.id ? 'not-allowed' : 'pointer', padding: '6px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            {deleteLoadingId === order.id ? (
+                              <span style={{ width: '16px', height: '16px', border: '2px solid #ccc', borderTop: '2px solid #f44336', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                            ) : (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f44336" strokeWidth="2">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
                               </svg>
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              className="action-btn"
-                              title="Edit"
-                              onClick={() => handleEdit(order)}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                            </button>
-                            <button
-                              className="action-btn delete-btn"
-                              title="Delete"
-                              onClick={() => handleDelete(order.id)}
-                              disabled={deleteLoadingId === order.id}
-                            >
-                              {deleteLoadingId === order.id ? (
-                                <span style={{ width: '14px', height: '14px', border: '2px solid #ccc', borderTop: '2px solid #f44336', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                              ) : (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M3 6h18"/>
-                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                  <line x1="10" y1="11" x2="10" y2="17"/>
-                                  <line x1="14" y1="11" x2="14" y2="17"/>
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
 
-                    {/* Medicines Expanded Row */}
-                    {expandedMedicines[order.id] && (
-                      <tr>
-                        <td colSpan="9" style={{ padding: '0', backgroundColor: '#fafafa', borderBottom: '2px solid #e0e0e0' }}>
-                          <div style={{ padding: '16px 24px 20px 24px' }}>
-
-                            {/* Header */}
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Expanded medicines */}
+                      {expandedMedicines[order.id] && (
+                        <tr>
+                          <td colSpan="11" style={{ padding: 0, backgroundColor: '#fafafa', borderBottom: '2px solid #e0e0e0' }}>
+                            <div style={{ padding: '16px 24px 20px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2">
                                   <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
                                 </svg>
                                 <span style={{ fontWeight: '600', fontSize: '14px', color: 'var(--warning)' }}>
-                                  Medicines in {order.id}
+                                  Medicines in Order #{order.id}
                                 </span>
                               </div>
 
-                              {/* Add medicine row button when editing */}
-                              {editingId === order.id && (
-                                <button
-                                  onClick={handleAddMedicineRow}
-                                  style={{ padding: '4px 12px', backgroundColor: 'var(--success)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
-                                >
-                                  + Add Medicine
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Medicines Table */}
-                            <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-                              <thead>
-                                <tr style={{ backgroundColor: '#fff3e0' }}>
-                                  <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Medicine Name</th>
-                                  <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Quantity</th>
-                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Unit Price</th>
-                                  <th style={{ textAlign: 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Subtotal</th>
-                                  {editingId === order.id && (
-                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>Remove</th>
-                                  )}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {(editingId === order.id ? editForm.medicines : order.medicines)?.map((med, index) => {
-                                  const unitPrice = parseFloat((med.price || '$0').replace('$', '')) || 0
-                                  const subtotal  = (unitPrice * (parseInt(med.qty) || 0)).toFixed(2)
-                                  return (
+                              <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                                <thead>
+                                  <tr style={{ backgroundColor: '#fff3e0' }}>
+                                    {['Medicine', 'Qty', 'Unit Price', 'Total'].map((h, i) => (
+                                      <th key={h} style={{ textAlign: i === 0 ? 'left' : i === 1 ? 'center' : 'right', padding: '10px 14px', fontSize: '12px', fontWeight: '600', color: 'var(--warning)', borderBottom: '1px solid #ffe0b2' }}>
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {order.medicines?.map((med, idx) => (
                                     <tr
-                                      key={index}
-                                      style={{ borderBottom: '1px solid #f5f5f5', transition: 'background 0.15s' }}
-                                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fff8f0'}
-                                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                      key={idx}
+                                      style={{ borderBottom: '1px solid #f5f5f5' }}
+                                      onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fff8f0'}
+                                      onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                                     >
-                                      {/* Medicine Name */}
                                       <td style={{ padding: '10px 14px', fontSize: '13px' }}>
-                                        {editingId === order.id ? (
-                                          <input
-                                            type="text"
-                                            value={med.name || ''}
-                                            onChange={(e) => handleMedicineChange(index, 'name', e.target.value)}
-                                            style={{ ...inputStyle, minWidth: '160px' }}
-                                            placeholder="Medicine name"
-                                          />
-                                        ) : (
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <span style={{ fontSize: '16px' }}>💊</span>
-                                            <span style={{ fontWeight: '500', color: '#333' }}>{med.name}</span>
-                                          </div>
-                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          {med.image && (
+                                            <img
+                                              src={`http://165.22.91.187:5000${med.image}`}
+                                              alt={med.name}
+                                              style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #e0e0e0' }}
+                                              onError={e => { e.target.style.display = 'none' }}
+                                            />
+                                          )}
+                                          <span style={{ fontWeight: '500', color: '#333' }}>💊 {med.name}</span>
+                                        </div>
                                       </td>
-
-                                      {/* Quantity */}
                                       <td style={{ padding: '10px 14px', textAlign: 'center', fontSize: '13px' }}>
-                                        {editingId === order.id ? (
-                                          <input
-                                            type="number"
-                                            min="1"
-                                            value={med.qty || ''}
-                                            onChange={(e) => handleMedicineChange(index, 'qty', e.target.value)}
-                                            style={{ ...inputStyle, width: '70px', textAlign: 'center' }}
-                                          />
-                                        ) : (
-                                          <span style={{ backgroundColor: '#f3f4f6', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', color: '#374151' }}>
-                                            x{med.qty}
-                                          </span>
-                                        )}
-                                      </td>
-
-                                      {/* Unit Price */}
-                                      <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px' }}>
-                                        {editingId === order.id ? (
-                                          <input
-                                            type="text"
-                                            value={med.price || ''}
-                                            onChange={(e) => handleMedicineChange(index, 'price', e.target.value)}
-                                            style={{ ...inputStyle, width: '90px', textAlign: 'right' }}
-                                            placeholder="$0.00"
-                                          />
-                                        ) : (
-                                          <span style={{ color: '#555' }}>{med.price}</span>
-                                        )}
-                                      </td>
-
-                                      {/* Subtotal */}
-                                      <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px' }}>
-                                        <span style={{ fontWeight: '700', color: 'var(--success)' }}>
-                                          ${subtotal}
+                                        <span style={{ backgroundColor: '#f3f4f6', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', color: '#374151' }}>
+                                          x{med.qty}
                                         </span>
                                       </td>
-
-                                      {/* Remove button (edit mode only) */}
-                                      {editingId === order.id && (
-                                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                          <button
-                                            onClick={() => handleRemoveMedicineRow(index)}
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
-                                            title="Remove medicine"
-                                          >
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                              <path d="M3 6h18"/>
-                                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                              <line x1="10" y1="11" x2="10" y2="17"/>
-                                              <line x1="14" y1="11" x2="14" y2="17"/>
-                                            </svg>
-                                          </button>
-                                        </td>
-                                      )}
+                                      <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px', color: '#555' }}>
+                                        {med.price}
+                                      </td>
+                                      <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: '13px' }}>
+                                        <span style={{ fontWeight: '700', color: 'var(--success)' }}>
+                                          ${(parseFloat(str(med.price).replace('$', '')) * med.qty).toFixed(2)}
+                                        </span>
+                                      </td>
                                     </tr>
-                                  )
-                                })}
-                              </tbody>
+                                  ))}
+                                </tbody>
+                                <tfoot>
+                                  <tr style={{ backgroundColor: '#fff3e0', borderTop: '2px solid #ffe0b2' }}>
+                                    <td colSpan="3" style={{ padding: '10px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--warning)' }}>
+                                      Subtotal ({order.medicines?.length || 0} items)
+                                    </td>
+                                    <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', fontSize: '14px', color: 'var(--success)' }}>
+                                      ${order.medicines
+                                        ?.reduce((sum, m) =>
+                                          sum + (parseFloat(str(m.price).replace('$', '')) || 0) * m.qty, 0
+                                        )
+                                        .toFixed(2)}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
 
-                              {/* Total Footer */}
-                              <tfoot>
-                                <tr style={{ backgroundColor: '#fff3e0', borderTop: '2px solid #ffe0b2' }}>
-                                  <td colSpan={editingId === order.id ? 3 : 3} style={{ padding: '10px 14px', fontWeight: '600', fontSize: '13px', color: 'var(--warning)' }}>
-                                    Total ({(editingId === order.id ? editForm.medicines : order.medicines)?.length || 0} items)
-                                  </td>
-                                  <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '700', fontSize: '14px', color: 'var(--success)' }}>
-                                    ${(editingId === order.id ? editForm.medicines : order.medicines)
-                                      ?.reduce((sum, m) => {
-                                        const price = parseFloat((m.price || '$0').replace('$', '')) || 0
-                                        return sum + price * (parseInt(m.qty) || 0)
-                                      }, 0)
-                                      .toFixed(2)
-                                    }
-                                  </td>
-                                  {editingId === order.id && <td />}
-                                </tr>
-                              </tfoot>
-                            </table>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
+                              {order.prescriptionImage && (
+                                <div style={{ marginTop: '16px' }}>
+                                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#666', marginBottom: '8px' }}>
+                                    Prescription:
+                                  </div>
+                                  <img
+                                    src={`http://165.22.91.187:5000${order.prescriptionImage}`}
+                                    alt="Prescription"
+                                    style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '8px', border: '1px solid #e0e0e0', cursor: 'pointer' }}
+                                    onClick={() => window.open(`http://165.22.91.187:5000${order.prescriptionImage}`, '_blank')}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
+
+      {/* Delivery Fee Modal */}
+      {deliveryFeeModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={e => { if (e.target === e.currentTarget) setDeliveryFeeModal(false) }}
+        >
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', padding: '32px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{ width: '44px', height: '44px', backgroundColor: '#fff3e0', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+                🚚
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Set Global Delivery Fee</h3>
+                <p style={{ margin: 0, color: '#888', fontSize: '12px' }}>Applies to all orders</p>
+              </div>
+            </div>
+
+            {/* Current fee display */}
+            <div style={{ margin: '16px 0', padding: '12px 16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', color: '#666' }}>Current fee</span>
+              <span style={{ fontSize: '18px', fontWeight: '700', color: '#1565c0' }}>
+                ${displayFee.toFixed(2)}
+              </span>
+            </div>
+
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+              New Delivery Fee ($)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={deliveryFeeValue}
+              onChange={e => setDeliveryFeeValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleDeliveryFeeSubmit()}
+              placeholder="e.g. 5.00"
+              autoFocus
+              style={{ ...inputStyle, marginBottom: '24px', fontSize: '16px', padding: '10px 12px' }}
+            />
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeliveryFeeModal(false)}
+                disabled={deliveryFeeLoading}
+                style={{ padding: '9px 20px', border: '1px solid #d1d5db', borderRadius: '8px', backgroundColor: '#fff', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeliveryFeeSubmit}
+                disabled={deliveryFeeLoading || deliveryFeeValue === ''}
+                style={{ padding: '9px 24px', border: 'none', borderRadius: '8px', backgroundColor: '#f57c00', color: '#fff', cursor: deliveryFeeLoading ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', opacity: deliveryFeeValue === '' ? 0.6 : 1, transition: 'opacity 0.2s' }}
+              >
+                {deliveryFeeLoading && (
+                  <span style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.4)', borderTop: '2px solid #fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                )}
+                {deliveryFeeLoading ? 'Saving…' : 'Save Fee'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
