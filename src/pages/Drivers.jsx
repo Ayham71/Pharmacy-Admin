@@ -248,7 +248,7 @@ const Drivers = () => {
       }
 
       if (editForm.image instanceof File) {
-        formData.append('image', editForm.image)
+        formData.append('ImageFile', editForm.image)
       }
 
       const response = await fetch(`${BASE_URL}/${editingId}`, {
@@ -349,7 +349,7 @@ const Drivers = () => {
       formData.append('VehicleNumber', newDriver.vehicleNumber.trim())
 
       if (newDriver.image) {
-        formData.append('image', newDriver.image)
+        formData.append('ImageFile', newDriver.image)
       }
 
       const response = await fetch(BASE_URL, {
