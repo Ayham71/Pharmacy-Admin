@@ -563,7 +563,7 @@ const GlobalCatalog = ({ categories, setCategories }) => {
 
         {/* Header */}
         <div className="section-header">
-          <h3 className="section-title">Global Catalog Categories</h3>
+          <h3 className="section-title">Central Warehouse Categories</h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               className="btn btn-secondary"

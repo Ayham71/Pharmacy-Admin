@@ -3,7 +3,7 @@ import React from 'react'
 const Sidebar = ({ currentPage, setCurrentPage, onLogout }) => {
   const navItems = [
     { id: 'dashboard',  label: 'Dashboard',     icon: 'dashboard' },
-    { id: 'catalog',    label: 'Global Catalog', icon: 'catalog'   },
+    { id: 'catalog',    label: 'Central Warehouse', icon: 'catalog'   },
     { id: 'pharmacies', label: 'Pharmacies',     icon: 'pharmacy'  },
     { id: 'drivers',    label: 'Drivers',        icon: 'driver'    },
     { id: 'patients',   label: 'Patients',       icon: 'patient'   },
