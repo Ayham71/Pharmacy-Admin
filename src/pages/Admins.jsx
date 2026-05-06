@@ -357,9 +357,9 @@ const Admins = () => {
             Loading admins...
           </div>
         ) : adminsError ? (
-          <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: '#c62828', fontSize: '14px' }}>
+          <div style={{ padding: '12px 16px', backgroundColor: '#ffebee', borderLeft: '4px solid #f44336', borderRadius: '4px', color: 'var(--danger)', fontSize: '14px' }}>
             ⚠️ {adminsError}
-            <button onClick={fetchAllAdmins} style={{ marginLeft: '12px', padding: '4px 12px', border: '1px solid #c62828', borderRadius: '4px', background: 'transparent', color: '#c62828', cursor: 'pointer', fontSize: '12px' }}>
+            <button onClick={fetchAllAdmins} style={{ marginLeft: '12px', padding: '4px 12px', border: '1px solid var(--danger)', borderRadius: '4px', background: 'transparent', color: 'var(--danger)', cursor: 'pointer', fontSize: '12px' }}>
               Retry
             </button>
           </div>
