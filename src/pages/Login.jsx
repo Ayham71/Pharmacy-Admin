@@ -93,7 +93,7 @@ const Login = ({ onLogin }) => {
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="icon-wrapper">
           <div className="icon-box">
-            <img src="/logo.jpeg" alt="Pharmacy Icon" />
+            <img src="/logo.png" alt="Pharmacy Icon" />
           </div>
         </div>
 

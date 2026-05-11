@@ -79,7 +79,7 @@ const Sidebar = ({ currentPage, setCurrentPage, onLogout }) => {
       <div className="sidebar-header">
         <div className="logo">
           <div className="logo-icon">
-            <img src="logo.jpeg" alt="Logo"
+            <img src="logo.png" alt="Logo"
               style={{ width: 70, height: 70, borderRadius: 40 }} />
           </div>
           <div className="logo-text">
