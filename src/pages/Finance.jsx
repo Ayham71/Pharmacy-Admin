@@ -37,6 +37,99 @@ const Finance = () => {
     .filter((t) => t.status === 'pending')
     .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
 
+  const pendingCount = transactions.filter((t) => t.status === 'pending').length
+
+  // ─── Dynamic Change Calculation ───────────────────────────────────────────
+  // Split transactions into current and previous half to compare trends
+  const midPoint = Math.floor(transactions.length / 2)
+  const recentTransactions = transactions.slice(midPoint)
+  const olderTransactions = transactions.slice(0, midPoint)
+
+  const calcChange = (recent, older, type) => {
+    // If no transactions at all, return neutral
+    if (transactions.length === 0) return { label: '—', changeType: 'neutral' }
+
+    const recentTotal = recent
+      .filter((t) => t.type === type)
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+
+    const olderTotal = older
+      .filter((t) => t.type === type)
+      .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+
+    // Not enough data to compare yet
+    if (olderTotal === 0 && recentTotal === 0) return { label: '—', changeType: 'neutral' }
+
+    // First batch of transactions, no older data to compare
+    if (olderTotal === 0) return { label: 'New', changeType: 'positive' }
+
+    const percent = (((recentTotal - olderTotal) / olderTotal) * 100).toFixed(1)
+    const isPositive = parseFloat(percent) >= 0
+
+    return {
+      label: `${isPositive ? '+' : ''}${percent}%`,
+      // For expenses, an increase is bad (negative), decrease is good (positive)
+      changeType: type === 'expense'
+        ? isPositive ? 'negative' : 'positive'
+        : isPositive ? 'positive' : 'negative',
+    }
+  }
+
+  const revenueChange = calcChange(recentTransactions, olderTransactions, 'income')
+  const expenseChange = calcChange(recentTransactions, olderTransactions, 'expense')
+
+  // Net profit change
+  const calcNetChange = () => {
+    if (transactions.length === 0) return { label: '—', changeType: 'neutral' }
+
+    const recentNet =
+      recentTransactions
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0) -
+      recentTransactions
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+
+    const olderNet =
+      olderTransactions
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0) -
+      olderTransactions
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount) || 0), 0)
+
+    if (olderNet === 0 && recentNet === 0) return { label: '—', changeType: 'neutral' }
+    if (olderNet === 0) return { label: 'New', changeType: recentNet >= 0 ? 'positive' : 'negative' }
+
+    const percent = (((recentNet - olderNet) / Math.abs(olderNet)) * 100).toFixed(1)
+    const isPositive = parseFloat(percent) >= 0
+
+    return {
+      label: `${isPositive ? '+' : ''}${percent}%`,
+      changeType: isPositive ? 'positive' : 'negative',
+    }
+  }
+
+  const netProfitChange = calcNetChange()
+
+  // Pending change label
+  const pendingChange = () => {
+    if (pendingCount === 0) return { label: '—', changeType: 'neutral' }
+    return {
+      label: `${pendingCount} pending`,
+      changeType: 'positive',
+    }
+  }
+
+  const pendingInfo = pendingChange()
+
+  // ─── Progress bar percentages (relative to max value) ────────────────────
+  const maxValue = Math.max(totalRevenue, totalExpenses, 1)
+  const revenueProgress = Math.round((totalRevenue / maxValue) * 100)
+  const expenseProgress = Math.round((totalExpenses / maxValue) * 100)
+  const netProfitProgress = netProfit > 0 ? Math.round((netProfit / totalRevenue) * 100) || 0 : 0
+  const pendingProgress = totalRevenue > 0 ? Math.round((pendingPayments / totalRevenue) * 100) || 0 : 0
+
   const stats = [
     {
       label: 'Total Revenue',
@@ -46,9 +139,9 @@ const Finance = () => {
           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
         </svg>
       ),
-      change: '+12.5%',
-      changeType: 'positive',
-      progress: 75,
+      change: revenueChange.label,
+      changeType: revenueChange.changeType,
+      progress: revenueProgress,
     },
     {
       label: 'Total Expenses',
@@ -60,9 +153,9 @@ const Finance = () => {
           <path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z" />
         </svg>
       ),
-      change: '-3.2%',
-      changeType: 'negative',
-      progress: 45,
+      change: expenseChange.label,
+      changeType: expenseChange.changeType,
+      progress: expenseProgress,
     },
     {
       label: 'Net Profit',
@@ -73,9 +166,9 @@ const Finance = () => {
           <polyline points="17 6 23 6 23 12" />
         </svg>
       ),
-      change: '+8.1%',
-      changeType: 'positive',
-      progress: 60,
+      change: netProfitChange.label,
+      changeType: netProfitChange.changeType,
+      progress: netProfitProgress,
     },
     {
       label: 'Pending Payments',
@@ -85,9 +178,9 @@ const Finance = () => {
           <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
       ),
-      change: '5 pending',
-      changeType: 'positive',
-      progress: 30,
+      change: pendingInfo.label,
+      changeType: pendingInfo.changeType,
+      progress: pendingProgress,
     },
   ]
 
@@ -105,13 +198,29 @@ const Finance = () => {
     try {
       setLoading(true)
       setError(null)
+
       const response = await fetch(API_URL)
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      // 404 means no data yet, not a real error
+      if (response.status === 404) {
+        setTransactions([])
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       const data = await response.json()
-      setTransactions(data)
+      setTransactions(Array.isArray(data) ? data : [])
+
     } catch (err) {
-      setError('Failed to load transactions. Please try again.')
       console.error('GET Error:', err)
+      // Only show error for real failures, not empty data
+      if (response?.status !== 404) {
+        setError('Failed to load transactions. Please try again.')
+      }
+      setTransactions([])
     } finally {
       setLoading(false)
     }
@@ -352,11 +461,12 @@ const Finance = () => {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-          className="btn btn-secondary"
-          onClick={fetchTransactions}
-          disabled={loading}
-          style={{ padding: '8px 16px', fontSize: '14px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={fetchTransactions}
+            disabled={loading}
+            style={{ padding: '8px 16px', fontSize: '14px' }}
+          >
             🔄 Refresh
           </button>
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
@@ -390,7 +500,14 @@ const Finance = () => {
           {error}
           <button
             onClick={() => setError(null)}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: '700' }}
+            style={{
+              marginLeft: 'auto',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--danger)',
+              fontWeight: '700',
+            }}
           >
             ✕
           </button>
@@ -407,7 +524,10 @@ const Finance = () => {
             </div>
             <div className="stat-value">
               <span className="stat-number" style={{ fontSize: '24px' }}>{stat.value}</span>
-              <span className={`stat-change ${stat.changeType}`}>{stat.change}</span>
+              {/* Only render the change badge if there is actual data */}
+              {transactions.length > 0 && (
+                <span className={`stat-change ${stat.changeType}`}>{stat.change}</span>
+              )}
             </div>
             <div className="stat-progress">
               <div className="stat-progress-bar" style={{ width: `${stat.progress}%` }} />
