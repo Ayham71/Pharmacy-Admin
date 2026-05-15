@@ -20,12 +20,18 @@ const Dashboard = ({ setCurrentPage, categories }) => {
     orders:     '—',
   })
   const [recentOrders, setRecentOrders]   = useState([])
-  const [loadingStats, setLoadingStats]   = useState(true)
-  const [loadingOrders, setLoadingOrders] = useState(true)
+  const [topPatients, setTopPatients]     = useState([])
+  const [topDrivers, setTopDrivers]       = useState([])
+  const [topPharmacies, setTopPharmacies] = useState([])
+  
+  const [loadingStats, setLoadingStats]     = useState(true)
+  const [loadingOrders, setLoadingOrders]   = useState(true)
+  const [loadingTop, setLoadingTop]         = useState(true)
 
   useEffect(() => {
     fetchStats()
     fetchRecentOrders()
+    fetchTopPerformers()
   }, [])
 
   // ─── Auth header ───────────────────────────────────────────────────────────
@@ -51,7 +57,7 @@ const Dashboard = ({ setCurrentPage, categories }) => {
           safeFetch(`${ADMIN_URL}/Pharmacy`),
           safeFetch(`${ADMIN_URL}/Delivery`),
           safeFetch(`${ADMIN_URL}/Patient`),
-          safeFetch(`${ORDERS_URL}`),          // ← real orders endpoint
+          safeFetch(`${ORDERS_URL}`),
         ])
 
       setStats({
@@ -83,17 +89,20 @@ const Dashboard = ({ setCurrentPage, categories }) => {
     }
   }
 
-  // ─── Normalize one raw order (same logic as Orders.jsx) ───────────────────
+  // ─── Normalize one raw order ───────────────────────────────────────────────
   const normalizeOrder = (raw) => ({
-    id:       str(raw.id       || raw.orderId   || '—'),
-    pharmacy: str(raw.pharmacyName || raw.pharmacy  || '—'),
-    patient:  str(raw.patientName  || raw.patient   || raw.userName || '—'),
-    driver:   str(raw.driverName   || raw.driver    || 'Unassigned'),
-    status:   str(raw.status || 'pending').toLowerCase(),
-    value:    raw.totalPrice != null
-                ? `$${Number(raw.totalPrice).toFixed(2)}`
-                : str(raw.value || '—'),
-    date:     str(raw.createdAt || raw.date || '').slice(0, 10),
+    id:         str(raw.id || raw.orderId || '—'),
+    pharmacy:   str(raw.pharmacyName || raw.pharmacy || '—'),
+    pharmacyId: str(raw.pharmacyId || raw.pharmacy_id || ''),
+    patient:    str(raw.patientName || raw.patient || raw.userName || '—'),
+    patientId:  str(raw.patientId || raw.patient_id || raw.userId || ''),
+    driver:     str(raw.driverName || raw.driver || 'Unassigned'),
+    driverId:   str(raw.driverId || raw.driver_id || ''),
+    status:     str(raw.status || 'pending').toLowerCase(),
+    value:      raw.totalPrice != null
+                  ? Number(raw.totalPrice)
+                  : 0,
+    date:       str(raw.createdAt || raw.date || '').slice(0, 10),
   })
 
   // ─── Recent orders ─────────────────────────────────────────────────────────
@@ -122,7 +131,93 @@ const Dashboard = ({ setCurrentPage, categories }) => {
     }
   }
 
-  // ─── Status badge style (matches Orders.jsx) ──────────────────────────────
+  // ─── Top Performers (Patients, Drivers, Pharmacies) ───────────────────────
+  const fetchTopPerformers = async () => {
+    setLoadingTop(true)
+    try {
+      const data = await safeFetch(ORDERS_URL)
+      if (!data) { setLoadingTop(false); return }
+
+      const rawList = Array.isArray(data)
+        ? data
+        : data?.orders || data?.data || data?.result || []
+
+      const normalized = rawList.map(normalizeOrder)
+
+      // ── Top Patients (by order count) ──
+      const patientMap = {}
+      normalized.forEach(o => {
+        if (o.patientId && o.patient !== '—') {
+          if (!patientMap[o.patientId]) {
+            patientMap[o.patientId] = { name: o.patient, count: 0, total: 0 }
+          }
+          patientMap[o.patientId].count++
+          patientMap[o.patientId].total += o.value
+        }
+      })
+      const topPatientsData = Object.values(patientMap)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map((p, idx) => ({
+          rank: idx + 1,
+          name: p.name,
+          orders: p.count,
+          total: `$${p.total.toFixed(2)}`
+        }))
+      setTopPatients(topPatientsData)
+
+      // ── Top Drivers (by delivery count, only delivered orders) ──
+      const driverMap = {}
+      normalized
+        .filter(o => ['delivered', 'done', 'completed'].includes(o.status))
+        .forEach(o => {
+          if (o.driverId && o.driver !== 'Unassigned' && o.driver !== '—') {
+            if (!driverMap[o.driverId]) {
+              driverMap[o.driverId] = { name: o.driver, count: 0 }
+            }
+            driverMap[o.driverId].count++
+          }
+        })
+      const topDriversData = Object.values(driverMap)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map((d, idx) => ({
+          rank: idx + 1,
+          name: d.name,
+          deliveries: d.count
+        }))
+      setTopDrivers(topDriversData)
+
+      // ── Top Pharmacies (by sales value) ──
+      const pharmacyMap = {}
+      normalized.forEach(o => {
+        if (o.pharmacyId && o.pharmacy !== '—') {
+          if (!pharmacyMap[o.pharmacyId]) {
+            pharmacyMap[o.pharmacyId] = { name: o.pharmacy, count: 0, total: 0 }
+          }
+          pharmacyMap[o.pharmacyId].count++
+          pharmacyMap[o.pharmacyId].total += o.value
+        }
+      })
+      const topPharmaciesData = Object.values(pharmacyMap)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5)
+        .map((p, idx) => ({
+          rank: idx + 1,
+          name: p.name,
+          orders: p.count,
+          sales: `$${p.total.toFixed(2)}`
+        }))
+      setTopPharmacies(topPharmaciesData)
+
+    } catch (err) {
+      console.error('fetchTopPerformers error:', err)
+    } finally {
+      setLoadingTop(false)
+    }
+  }
+
+  // ─── Status badge style ────────────────────────────────────────────────────
   const getStatusStyle = (status) => {
     const s = str(status).toLowerCase().trim()
     switch (s) {
@@ -148,6 +243,16 @@ const Dashboard = ({ setCurrentPage, categories }) => {
                  label: s === 'rejected' ? 'Rejected' : s === 'failed' ? 'Failed' : 'Cancelled' }
       default:
         return { bg: '#f5f5f5', color: '#424242', border: '#9e9e9e', label: status || 'Unknown' }
+    }
+  }
+
+  // ─── Medal color for ranking ───────────────────────────────────────────────
+  const getMedalColor = (rank) => {
+    switch(rank) {
+      case 1: return '#FFD700' // Gold
+      case 2: return '#C0C0C0' // Silver
+      case 3: return '#CD7F32' // Bronze
+      default: return '#E0E0E0' // Gray
     }
   }
 
@@ -266,7 +371,6 @@ const Dashboard = ({ setCurrentPage, categories }) => {
               e.currentTarget.style.boxShadow  = '0 2px 8px rgba(0,0,0,0.07)'
             }}
           >
-            {/* Background accent */}
             <div style={{
               position: 'absolute', top: 0, right: 0,
               width: '80px', height: '80px',
@@ -275,7 +379,6 @@ const Dashboard = ({ setCurrentPage, categories }) => {
               zIndex: 0,
             }} />
 
-            {/* Icon */}
             <div style={{
               position: 'absolute', top: '14px', right: '14px',
               width: '40px', height: '40px',
@@ -288,7 +391,6 @@ const Dashboard = ({ setCurrentPage, categories }) => {
               {getIcon(stat.icon)}
             </div>
 
-            {/* Content */}
             <div style={{ position: 'relative', zIndex: 1 }}>
               <p style={{ fontSize: '13px', color: 'var(--medium-gray)', fontWeight: '500', marginBottom: '8px' }}>
                 {stat.label}
@@ -299,7 +401,6 @@ const Dashboard = ({ setCurrentPage, categories }) => {
                 ) : stat.value}
               </p>
 
-              {/* Progress bar */}
               <div style={{ height: '4px', backgroundColor: '#f0f0f0', borderRadius: '2px', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
@@ -395,16 +496,9 @@ const Dashboard = ({ setCurrentPage, categories }) => {
                       onMouseEnter={e => e.currentTarget.style.backgroundColor = '#fafafa'}
                       onMouseLeave={e => e.currentTarget.style.backgroundColor = ''}
                     >
-                      {/* Order ID */}
                       <td className="order-id">{order.id}</td>
-
-                      {/* Pharmacy */}
                       <td>{order.pharmacy}</td>
-
-                      {/* Patient */}
                       <td>{order.patient}</td>
-
-                      {/* Driver */}
                       <td>
                         <div className="driver-info">
                           <img
@@ -415,8 +509,6 @@ const Dashboard = ({ setCurrentPage, categories }) => {
                           <span>{order.driver || '—'}</span>
                         </div>
                       </td>
-
-                      {/* Status */}
                       <td>
                         <span style={{
                           display: 'inline-block',
@@ -432,11 +524,7 @@ const Dashboard = ({ setCurrentPage, categories }) => {
                           {ss.label}
                         </span>
                       </td>
-
-                      {/* Value */}
-                      <td className="value-cell">{order.value}</td>
-
-                      {/* Date */}
+                      <td className="value-cell">${order.value.toFixed(2)}</td>
                       <td style={{ fontSize: '13px', color: 'var(--medium-gray)' }}>
                         {order.date
                           ? new Date(order.date).toLocaleDateString('en-GB', {
@@ -453,6 +541,231 @@ const Dashboard = ({ setCurrentPage, categories }) => {
             </table>
           </div>
         )}
+      </div>
+
+      {/* ── TOP PERFORMERS (3 Tables) ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: '20px',
+        marginTop: '28px',
+      }}>
+
+        {/* ── TOP 5 PATIENTS ── */}
+        <div className="section">
+          <div className="section-header">
+            <h3 className="section-title" style={{ fontSize: '16px' }}>🏆 Top Patients</h3>
+            <a className="view-all-link" onClick={() => setCurrentPage('patients')} style={{ cursor: 'pointer', fontSize: '12px' }}>
+              View All →
+            </a>
+          </div>
+          {loadingTop ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)' }}>
+              <div style={{ width: '24px', height: '24px', border: '2px solid #e0e0e0', borderTop: '2px solid #1976d2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+              <small>Loading...</small>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50px' }}>Rank</th>
+                    <th>Patient</th>
+                    <th style={{ textAlign: 'center' }}>Orders</th>
+                    <th style={{ textAlign: 'right' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topPatients.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)', fontSize: '13px' }}>
+                        No data available
+                      </td>
+                    </tr>
+                  ) : topPatients.map((p) => (
+                    <tr key={p.rank}>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: getMedalColor(p.rank),
+                          color: p.rank <= 3 ? '#fff' : '#666',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                        }}>
+                          {p.rank}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="driver-info">
+                          <img
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=FFC107&color=fff&size=64`}
+                            alt={p.name}
+                            className="driver-avatar"
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: '500' }}>{p.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1976d2' }}>
+                        {p.orders}
+                      </td>
+                      <td style={{ textAlign: 'right', fontSize: '13px', fontWeight: '700', color: '#2e7d32' }}>
+                        {p.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ── TOP 5 DRIVERS ── */}
+        <div className="section">
+          <div className="section-header">
+            <h3 className="section-title" style={{ fontSize: '16px' }}>🚚 Top Drivers</h3>
+            <a className="view-all-link" onClick={() => setCurrentPage('drivers')} style={{ cursor: 'pointer', fontSize: '12px' }}>
+              View All →
+            </a>
+          </div>
+          {loadingTop ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)' }}>
+              <div style={{ width: '24px', height: '24px', border: '2px solid #e0e0e0', borderTop: '2px solid #1976d2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+              <small>Loading...</small>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50px' }}>Rank</th>
+                    <th>Driver</th>
+                    <th style={{ textAlign: 'center' }}>Deliveries</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topDrivers.length === 0 ? (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)', fontSize: '13px' }}>
+                        No data available
+                      </td>
+                    </tr>
+                  ) : topDrivers.map((d) => (
+                    <tr key={d.rank}>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: getMedalColor(d.rank),
+                          color: d.rank <= 3 ? '#fff' : '#666',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                        }}>
+                          {d.rank}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="driver-info">
+                          <img
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(d.name)}&background=FFD700&color=fff&size=64`}
+                            alt={d.name}
+                            className="driver-avatar"
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: '500' }}>{d.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1976d2' }}>
+                        {d.deliveries}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ── TOP 5 PHARMACIES ── */}
+        <div className="section">
+          <div className="section-header">
+            <h3 className="section-title" style={{ fontSize: '16px' }}>🏥 Top Pharmacies</h3>
+            <a className="view-all-link" onClick={() => setCurrentPage('pharmacies')} style={{ cursor: 'pointer', fontSize: '12px' }}>
+              View All →
+            </a>
+          </div>
+          {loadingTop ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)' }}>
+              <div style={{ width: '24px', height: '24px', border: '2px solid #e0e0e0', borderTop: '2px solid #1976d2', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+              <small>Loading...</small>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '50px' }}>Rank</th>
+                    <th>Pharmacy</th>
+                    <th style={{ textAlign: 'center' }}>Orders</th>
+                    <th style={{ textAlign: 'right' }}>Sales</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topPharmacies.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: 'var(--medium-gray)', fontSize: '13px' }}>
+                        No data available
+                      </td>
+                    </tr>
+                  ) : topPharmacies.map((p) => (
+                    <tr key={p.rank}>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          backgroundColor: getMedalColor(p.rank),
+                          color: p.rank <= 3 ? '#fff' : '#666',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                        }}>
+                          {p.rank}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="driver-info">
+                          <img
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=4CAF50&color=fff&size=64`}
+                            alt={p.name}
+                            className="driver-avatar"
+                          />
+                          <span style={{ fontSize: '13px', fontWeight: '500' }}>{p.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1976d2' }}>
+                        {p.orders}
+                      </td>
+                      <td style={{ textAlign: 'right', fontSize: '13px', fontWeight: '700', color: '#2e7d32' }}>
+                        {p.sales}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
